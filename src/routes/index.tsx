@@ -3,7 +3,6 @@ import { useState, useMemo, type ReactNode } from "react";
 import { toast } from "sonner";
 import {
   LayoutDashboard,
-  Lightbulb,
   Wand2,
   Calendar as CalendarIcon,
   Settings,
@@ -45,7 +44,20 @@ import {
   Bookmark,
   Timer,
   BarChart3,
+  FolderKanban,
+  Repeat,
+  FolderPlus,
+  User,
+  UserCog,
 } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 export const Route = createFileRoute("/")({
   component: OmniForgeApp,
@@ -215,8 +227,8 @@ function OmniForgeApp() {
   if (!authed) return <PasswordWall onUnlock={() => setAuthed(true)} />;
 
   return (
-    <div className="flex min-h-screen w-full bg-background text-foreground">
-      {view !== "composer" && <Sidebar view={view} setView={setView} />}
+    <div className="flex min-h-screen w-full flex-col bg-background text-foreground">
+      <TopNav view={view} navigate={navigate} />
       <main className="flex-1 overflow-x-hidden">
         <div key={view} className="animate-in fade-in slide-in-from-bottom-2 duration-300">
           {view === "metrics" && <PlatformMetrics />}
@@ -305,55 +317,104 @@ function PasswordWall({ onUnlock }: { onUnlock: () => void }) {
   );
 }
 
-// ---------- SIDEBAR ----------
-function Sidebar({ view, setView }: { view: View; setView: (v: View) => void }) {
-  const items: { id: View; label: string; icon: typeof LayoutDashboard }[] = [
-    { id: "metrics", label: "Platform Metrics", icon: BarChart3 },
-    { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
-    { id: "ideas", label: "Idea Engine", icon: Lightbulb },
-    { id: "composer", label: "Asset Composer", icon: Wand2 },
+// ---------- TOP NAVIGATION ----------
+function TopNav({
+  view,
+  navigate,
+}: {
+  view: View;
+  navigate: (v: View, seed?: ComposerSeed) => void;
+}) {
+  const navItems: { id: View; label: string; icon: typeof LayoutDashboard }[] = [
+    { id: "composer", label: "Post Composer", icon: Wand2 },
     { id: "calendar", label: "Calendar", icon: CalendarIcon },
-    { id: "settings", label: "Settings", icon: Settings },
+    { id: "metrics", label: "Metrics", icon: BarChart3 },
   ];
+  // "My Projects" surfaces the Dashboard (View Projects) and Settings (Project Settings).
+  const projectsActive = view === "dashboard" || view === "settings";
+
+  const navBtn = (active: boolean) =>
+    `inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium transition ${
+      active
+        ? "bg-primary text-primary-foreground shadow-md shadow-primary/30"
+        : "text-muted-foreground hover:bg-sidebar-accent hover:text-foreground"
+    }`;
+
   return (
-    <aside className="sticky top-0 flex h-screen w-64 shrink-0 flex-col border-r border-sidebar-border bg-sidebar p-5">
-      <div className="mb-8 flex items-center gap-3">
-        <div className="grid h-10 w-10 place-items-center rounded-xl bg-primary shadow-md shadow-primary/40">
+    <header className="sticky top-0 z-40 flex h-16 shrink-0 items-center gap-2 border-b border-sidebar-border bg-sidebar/95 px-4 backdrop-blur md:px-6">
+      {/* Brand → Dashboard (home) */}
+      <button
+        onClick={() => navigate("dashboard")}
+        className="mr-1 flex items-center gap-3 rounded-xl px-1 py-1 transition hover:opacity-90"
+        aria-label="Go to dashboard"
+      >
+        <div className="grid h-9 w-9 place-items-center rounded-xl bg-primary shadow-md shadow-primary/40">
           <Zap className="h-5 w-5 text-primary-foreground" />
         </div>
-        <div>
-          <div className="text-sm font-semibold tracking-tight">OmniForge</div>
-          <div className="text-[11px] text-muted-foreground">Automation Studio</div>
+        <div className="hidden text-left sm:block">
+          <div className="text-sm font-semibold leading-tight tracking-tight">OmniForge</div>
+          <div className="text-[11px] leading-tight text-muted-foreground">Automation Studio</div>
         </div>
-      </div>
-      <nav className="flex flex-col gap-1">
-        {items.map(({ id, label, icon: Icon }) => {
-          const active = view === id;
-          return (
-            <button
-              key={id}
-              onClick={() => setView(id)}
-              className={`group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition ${
-                active
-                  ? "bg-primary text-primary-foreground shadow-md shadow-primary/30"
-                  : "text-muted-foreground hover:bg-sidebar-accent hover:text-foreground"
-              }`}
-            >
-              <Icon className="h-4 w-4" />
-              {label}
+      </button>
+
+      {/* Primary navigation */}
+      <nav className="ml-1 flex items-center gap-1">
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button className={navBtn(projectsActive)} aria-label="My Projects menu">
+              <FolderKanban className="h-4 w-4" />
+              <span className="hidden md:inline">My Projects</span>
+              <ChevronDown className="h-3.5 w-3.5 opacity-70" />
             </button>
-          );
-        })}
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" className="w-56">
+            <DropdownMenuLabel>Projects</DropdownMenuLabel>
+            <DropdownMenuItem onClick={() => navigate("dashboard")}>
+              <LayoutDashboard className="mr-2 h-4 w-4" /> View Projects
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => toast("Switch project — coming soon")}>
+              <Repeat className="mr-2 h-4 w-4" /> Switch Projects
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => toast("Create project — coming soon")}>
+              <FolderPlus className="mr-2 h-4 w-4" /> Create Project
+            </DropdownMenuItem>
+
+            <DropdownMenuSeparator />
+            <DropdownMenuLabel>Project Settings</DropdownMenuLabel>
+            <DropdownMenuItem onClick={() => navigate("settings")}>
+              <Settings className="mr-2 h-4 w-4" /> Project Settings
+            </DropdownMenuItem>
+
+            <DropdownMenuSeparator />
+            <DropdownMenuLabel>Profile</DropdownMenuLabel>
+            <DropdownMenuItem onClick={() => toast("User profile — coming soon")}>
+              <User className="mr-2 h-4 w-4" /> User Profile
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => navigate("settings")}>
+              <UserCog className="mr-2 h-4 w-4" /> Account Settings
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => navigate("settings")}>
+              <SlidersHorizontal className="mr-2 h-4 w-4" /> Preferences
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+
+        {navItems.map(({ id, label, icon: Icon }) => (
+          <button key={id} onClick={() => navigate(id)} className={navBtn(view === id)}>
+            <Icon className="h-4 w-4" />
+            <span className="hidden md:inline">{label}</span>
+          </button>
+        ))}
       </nav>
-      <div className="mt-auto rounded-xl border border-sidebar-border bg-sidebar-accent/40 p-4">
-        <div className="flex items-center gap-2 text-xs font-medium text-foreground">
-          <ShieldCheck className="h-3.5 w-3.5 text-primary" /> Pro Workspace
-        </div>
-        <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
-          12 posts scheduled · 4.5 hrs saved this week.
-        </p>
-      </div>
-    </aside>
+
+      {/* Create → AI Idea Engine */}
+      <button
+        onClick={() => navigate("ideas")}
+        className="ml-auto inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/30 transition hover:brightness-110"
+      >
+        <Sparkles className="h-4 w-4" /> Create
+      </button>
+    </header>
   );
 }
 
@@ -831,9 +892,9 @@ function Composer({
           <h3 className="text-base font-bold tracking-tight text-[#33333a]">AI Idea Engine</h3>
           <button
             onClick={onExplore}
-            className="text-sm font-semibold text-[#9258ff] transition hover:text-[#7a42ed]"
+            className="inline-flex items-center gap-1 text-sm font-semibold text-[#9258ff] transition hover:text-[#7a42ed]"
           >
-            Explore all
+            Explore All <ArrowRight className="h-3.5 w-3.5" />
           </button>
         </div>
 
