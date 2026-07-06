@@ -38,13 +38,20 @@ import {
   FileText,
   PanelLeftClose,
   PanelRightClose,
+  Plus,
+  Heart,
+  MessageCircle,
+  Share2,
+  Bookmark,
+  Timer,
+  BarChart3,
 } from "lucide-react";
 
 export const Route = createFileRoute("/")({
   component: OmniForgeApp,
 });
 
-type View = "dashboard" | "ideas" | "composer" | "calendar" | "settings";
+type View = "metrics" | "dashboard" | "ideas" | "composer" | "calendar" | "settings";
 
 interface ComposerSeed {
   caption: string;
@@ -196,7 +203,7 @@ const AI_CLIPS = [
 // ---------- ROOT ----------
 function OmniForgeApp() {
   const [authed, setAuthed] = useState(false);
-  const [view, setView] = useState<View>("dashboard");
+  const [view, setView] = useState<View>("metrics");
   const [composerSeed, setComposerSeed] = useState<ComposerSeed | null>(null);
   const [calendar, setCalendar] = useState(INITIAL_CALENDAR);
 
@@ -212,6 +219,7 @@ function OmniForgeApp() {
       {view !== "composer" && <Sidebar view={view} setView={setView} />}
       <main className="flex-1 overflow-x-hidden">
         <div key={view} className="animate-in fade-in slide-in-from-bottom-2 duration-300">
+          {view === "metrics" && <PlatformMetrics />}
           {view === "dashboard" && <Dashboard navigate={navigate} />}
           {view === "ideas" && <IdeaEngine navigate={navigate} />}
           {view === "composer" && (
@@ -300,6 +308,7 @@ function PasswordWall({ onUnlock }: { onUnlock: () => void }) {
 // ---------- SIDEBAR ----------
 function Sidebar({ view, setView }: { view: View; setView: (v: View) => void }) {
   const items: { id: View; label: string; icon: typeof LayoutDashboard }[] = [
+    { id: "metrics", label: "Platform Metrics", icon: BarChart3 },
     { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
     { id: "ideas", label: "Idea Engine", icon: Lightbulb },
     { id: "composer", label: "Asset Composer", icon: Wand2 },
@@ -345,6 +354,188 @@ function Sidebar({ view, setView }: { view: View; setView: (v: View) => void }) 
         </p>
       </div>
     </aside>
+  );
+}
+
+// ---------- PLATFORM METRICS ----------
+const PLATFORM_METRICS: {
+  name: string;
+  handle: string;
+  Icon: typeof Instagram;
+  color: string;
+  accent: string;
+  summary: string;
+  metrics: { label: string; value: string; delta: string; icon: typeof Heart }[];
+}[] = [
+  {
+    name: "Instagram",
+    handle: "@omniforge.app",
+    Icon: Instagram,
+    color: "from-[#F58529] via-[#DD2A7B] to-[#8134AF]",
+    accent: "text-pink-300",
+    summary: "Reels and carousel posts are carrying the strongest engagement this week.",
+    metrics: [
+      { label: "Overall likes", value: "48.2K", delta: "+18%", icon: Heart },
+      { label: "Comments", value: "3.8K", delta: "+9%", icon: MessageCircle },
+      { label: "Shares", value: "9.6K", delta: "+22%", icon: Share2 },
+      { label: "Saves", value: "6.1K", delta: "+14%", icon: Bookmark },
+      { label: "Watch time", value: "412h", delta: "+31%", icon: Timer },
+    ],
+  },
+  {
+    name: "TikTok",
+    handle: "@omniforge",
+    Icon: Music2,
+    color: "from-[#25F4EE] via-[#111827] to-[#FE2C55]",
+    accent: "text-cyan-200",
+    summary: "Short hooks under 12 seconds are producing the highest completion rate.",
+    metrics: [
+      { label: "Overall likes", value: "86.4K", delta: "+27%", icon: Heart },
+      { label: "Comments", value: "5.2K", delta: "+16%", icon: MessageCircle },
+      { label: "Shares", value: "14.8K", delta: "+34%", icon: Share2 },
+      { label: "Saves", value: "3.4K", delta: "+8%", icon: Bookmark },
+      { label: "Watch time", value: "690h", delta: "+41%", icon: Timer },
+    ],
+  },
+  {
+    name: "Facebook",
+    handle: "OmniForge Studio",
+    Icon: Facebook,
+    color: "from-[#1877F2] to-[#0A4EA8]",
+    accent: "text-blue-200",
+    summary: "Longer captions are driving comments while short clips lift shares.",
+    metrics: [
+      { label: "Overall likes", value: "22.7K", delta: "+11%", icon: Heart },
+      { label: "Comments", value: "2.1K", delta: "+7%", icon: MessageCircle },
+      { label: "Shares", value: "4.9K", delta: "+13%", icon: Share2 },
+      { label: "Saves", value: "1.8K", delta: "+5%", icon: Bookmark },
+      { label: "Watch time", value: "238h", delta: "+19%", icon: Timer },
+    ],
+  },
+  {
+    name: "YouTube",
+    handle: "OmniForge",
+    Icon: Youtube,
+    color: "from-[#FF0033] to-[#991B1B]",
+    accent: "text-red-200",
+    summary: "Shorts are expanding reach and pushing more viewers into repeat sessions.",
+    metrics: [
+      { label: "Overall likes", value: "31.9K", delta: "+15%", icon: Heart },
+      { label: "Comments", value: "1.9K", delta: "+6%", icon: MessageCircle },
+      { label: "Shares", value: "3.7K", delta: "+12%", icon: Share2 },
+      { label: "Subscribers", value: "1.2K", delta: "+10%", icon: TrendingUp },
+      { label: "Watch time", value: "884h", delta: "+25%", icon: Timer },
+    ],
+  },
+  {
+    name: "LinkedIn",
+    handle: "OmniForge",
+    Icon: Linkedin,
+    color: "from-[#0A66C2] to-[#064A8A]",
+    accent: "text-sky-200",
+    summary: "Educational posts are earning saves and profile visits from operators.",
+    metrics: [
+      { label: "Overall likes", value: "12.4K", delta: "+8%", icon: Heart },
+      { label: "Comments", value: "980", delta: "+12%", icon: MessageCircle },
+      { label: "Shares", value: "2.6K", delta: "+17%", icon: Share2 },
+      { label: "Saves", value: "1.1K", delta: "+15%", icon: Bookmark },
+      { label: "Watch time", value: "116h", delta: "+9%", icon: Timer },
+    ],
+  },
+];
+
+function PlatformMetrics() {
+  return (
+    <div className="min-h-screen px-6 py-8 md:px-8">
+      <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+        <Header
+          title="Platform Metrics"
+          subtitle="A quick performance window across every connected channel."
+        />
+        <button
+          onClick={() => toast.success("New post draft opened")}
+          className="inline-flex w-fit items-center justify-center gap-2 rounded-xl bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/30 transition hover:brightness-110"
+        >
+          <Plus className="h-4 w-4" /> Post
+        </button>
+      </div>
+
+      <div className="mt-8 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <Kpi icon={Heart} label="Total Engagement" value="312K" trend="+19% this week" />
+        <Kpi icon={Share2} label="Total Shares" value="35.6K" trend="+24% across channels" />
+        <Kpi icon={MessageCircle} label="Comments" value="14K" trend="+11% audience lift" />
+        <Kpi icon={Timer} label="Watch Time" value="2,340h" trend="+29% video momentum" />
+      </div>
+
+      <div className="mt-8 grid grid-cols-1 gap-5 lg:grid-cols-2 xl:grid-cols-3">
+        {PLATFORM_METRICS.map((platform) => (
+          <PlatformMetricWindow key={platform.name} platform={platform} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function PlatformMetricWindow({ platform }: { platform: (typeof PLATFORM_METRICS)[number] }) {
+  const Icon = platform.Icon;
+
+  return (
+    <section className="glass-card group flex min-h-[430px] flex-col overflow-hidden rounded-2xl transition hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-2xl hover:shadow-primary/10">
+      <div className={`h-1.5 bg-gradient-to-r ${platform.color}`} />
+      <div className="flex flex-1 flex-col p-5">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-3">
+              <div
+                className={`grid h-11 w-11 place-items-center rounded-xl bg-gradient-to-br ${platform.color} shadow-lg shadow-black/20`}
+              >
+                <Icon className="h-5 w-5 text-white" />
+              </div>
+              <div>
+                <h3 className="text-2xl font-semibold tracking-tight">{platform.name}</h3>
+                <p className="text-xs text-muted-foreground">{platform.handle}</p>
+              </div>
+            </div>
+          </div>
+          <span className="rounded-full border border-emerald-400/20 bg-emerald-400/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-emerald-300">
+            Live
+          </span>
+        </div>
+
+        <p className="mt-5 text-sm leading-relaxed text-muted-foreground">{platform.summary}</p>
+
+        <div className="mt-6 space-y-3">
+          {platform.metrics.map((metric) => (
+            <div
+              key={metric.label}
+              className="flex items-center justify-between rounded-xl border border-border bg-secondary/30 px-3 py-3"
+            >
+              <div className="flex min-w-0 items-center gap-3">
+                <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-primary/12 text-primary">
+                  <metric.icon className="h-4 w-4" />
+                </span>
+                <div className="min-w-0">
+                  <div className="truncate text-sm font-medium">{metric.label}</div>
+                  <div className="flex items-center gap-1 text-[11px] text-emerald-300">
+                    <TrendingUp className="h-3 w-3" /> {metric.delta}
+                  </div>
+                </div>
+              </div>
+              <div className="text-right text-lg font-semibold tracking-tight">{metric.value}</div>
+            </div>
+          ))}
+        </div>
+
+        <div className="mt-auto flex items-center justify-between border-t border-border pt-4">
+          <span className={`text-xs font-semibold uppercase tracking-wider ${platform.accent}`}>
+            Weekly summary
+          </span>
+          <button className="inline-flex items-center gap-1.5 text-xs font-semibold text-primary transition hover:text-primary/80">
+            View report <ArrowRight className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      </div>
+    </section>
   );
 }
 
