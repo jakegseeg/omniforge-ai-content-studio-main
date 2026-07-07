@@ -49,6 +49,10 @@ import {
   FolderPlus,
   User,
   UserCog,
+  ArrowLeft,
+  Eye,
+  Minus,
+  TrendingDown,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -505,7 +509,228 @@ const PLATFORM_METRICS: {
   },
 ];
 
+type MetricKey = "likes" | "comments" | "shares" | "watchTime";
+
+const METRIC_OPTIONS: { key: MetricKey; label: string; icon: typeof Heart }[] = [
+  { key: "likes", label: "Likes", icon: Heart },
+  { key: "comments", label: "Comments", icon: MessageCircle },
+  { key: "shares", label: "Shares", icon: Share2 },
+  { key: "watchTime", label: "Watch Time", icon: Timer },
+];
+
+const POST_PERFORMANCE: Record<
+  string,
+  {
+    title: string;
+    type: string;
+    date: string;
+    status: "up" | "down" | "flat";
+    summary: string;
+    values: Record<MetricKey, number[]>;
+  }[]
+> = {
+  Instagram: [
+    {
+      title: "Launch Reel",
+      type: "Reel",
+      date: "Apr 10",
+      status: "up",
+      summary: "Hook retention lifted shares after day 2.",
+      values: {
+        likes: [22, 31, 34, 47, 58, 64, 71],
+        comments: [10, 12, 15, 19, 23, 24, 29],
+        shares: [8, 11, 13, 20, 28, 34, 39],
+        watchTime: [18, 25, 30, 38, 49, 55, 62],
+      },
+    },
+    {
+      title: "Workflow Carousel",
+      type: "Carousel",
+      date: "Apr 11",
+      status: "flat",
+      summary: "Strong saves, but comment velocity settled.",
+      values: {
+        likes: [18, 23, 29, 31, 32, 33, 35],
+        comments: [9, 13, 13, 14, 14, 15, 15],
+        shares: [6, 8, 11, 12, 13, 13, 14],
+        watchTime: [10, 13, 17, 19, 20, 21, 21],
+      },
+    },
+    {
+      title: "Behind the Build",
+      type: "Reel",
+      date: "Apr 13",
+      status: "up",
+      summary: "Late pickup from saves and reposts.",
+      values: {
+        likes: [14, 18, 26, 39, 46, 60, 74],
+        comments: [7, 9, 15, 21, 26, 31, 38],
+        shares: [5, 7, 14, 19, 27, 35, 44],
+        watchTime: [16, 20, 29, 43, 54, 68, 79],
+      },
+    },
+    {
+      title: "Customer Proof",
+      type: "Story",
+      date: "Apr 15",
+      status: "down",
+      summary: "Initial interest dipped after day 3.",
+      values: {
+        likes: [20, 28, 30, 25, 22, 21, 20],
+        comments: [8, 12, 11, 9, 7, 7, 6],
+        shares: [7, 10, 9, 8, 6, 6, 5],
+        watchTime: [22, 29, 27, 23, 20, 18, 17],
+      },
+    },
+  ],
+  TikTok: [
+    {
+      title: "One-Minute Demo",
+      type: "Short",
+      date: "Apr 10",
+      status: "up",
+      summary: "Fast hook kept completion high.",
+      values: {
+        likes: [30, 42, 55, 69, 78, 88, 96],
+        comments: [14, 20, 27, 34, 40, 48, 53],
+        shares: [12, 20, 32, 45, 57, 66, 74],
+        watchTime: [24, 39, 55, 70, 82, 91, 100],
+      },
+    },
+    {
+      title: "Founder POV",
+      type: "Short",
+      date: "Apr 12",
+      status: "flat",
+      summary: "Good reach, modest share velocity.",
+      values: {
+        likes: [21, 33, 39, 42, 44, 45, 46],
+        comments: [8, 12, 14, 15, 16, 16, 17],
+        shares: [7, 10, 13, 15, 16, 17, 17],
+        watchTime: [18, 26, 31, 34, 36, 37, 38],
+      },
+    },
+    {
+      title: "Scheduler Hack",
+      type: "Short",
+      date: "Apr 14",
+      status: "up",
+      summary: "Shared heavily into small-business niches.",
+      values: {
+        likes: [25, 37, 48, 63, 80, 92, 104],
+        comments: [12, 18, 22, 31, 41, 47, 55],
+        shares: [15, 26, 38, 52, 69, 80, 91],
+        watchTime: [28, 43, 61, 78, 92, 108, 121],
+      },
+    },
+  ],
+  Facebook: [
+    {
+      title: "Customer Story",
+      type: "Reel",
+      date: "Apr 9",
+      status: "up",
+      summary: "Shares are rising from community groups.",
+      values: {
+        likes: [12, 16, 21, 28, 33, 36, 40],
+        comments: [6, 8, 11, 15, 17, 18, 21],
+        shares: [5, 9, 13, 19, 23, 27, 31],
+        watchTime: [14, 20, 26, 34, 39, 43, 48],
+      },
+    },
+    {
+      title: "Weekly Recap",
+      type: "Video",
+      date: "Apr 13",
+      status: "flat",
+      summary: "Steady watch time, low comment lift.",
+      values: {
+        likes: [10, 14, 18, 19, 20, 21, 22],
+        comments: [4, 6, 8, 8, 9, 9, 9],
+        shares: [3, 5, 7, 8, 8, 9, 9],
+        watchTime: [15, 19, 23, 25, 26, 27, 27],
+      },
+    },
+  ],
+  YouTube: [
+    {
+      title: "AI Scheduler Shorts",
+      type: "Short",
+      date: "Apr 10",
+      status: "up",
+      summary: "Watch time compounded after recommendations.",
+      values: {
+        likes: [18, 26, 39, 51, 65, 73, 84],
+        comments: [7, 10, 15, 20, 26, 31, 35],
+        shares: [5, 8, 12, 18, 24, 28, 33],
+        watchTime: [30, 48, 66, 88, 110, 129, 146],
+      },
+    },
+    {
+      title: "Product Walkthrough",
+      type: "Video",
+      date: "Apr 12",
+      status: "up",
+      summary: "Longer watch sessions are improving search lift.",
+      values: {
+        likes: [16, 22, 28, 36, 45, 52, 60],
+        comments: [5, 8, 11, 13, 18, 22, 25],
+        shares: [4, 6, 8, 10, 13, 15, 18],
+        watchTime: [42, 55, 71, 89, 103, 117, 134],
+      },
+    },
+  ],
+  LinkedIn: [
+    {
+      title: "Operations Playbook",
+      type: "Text Post",
+      date: "Apr 11",
+      status: "up",
+      summary: "Saves and profile visits are outpacing likes.",
+      values: {
+        likes: [9, 12, 18, 24, 30, 34, 39],
+        comments: [5, 7, 10, 14, 18, 20, 23],
+        shares: [4, 6, 9, 13, 17, 20, 24],
+        watchTime: [8, 10, 13, 17, 20, 23, 26],
+      },
+    },
+    {
+      title: "Launch Retrospective",
+      type: "Document",
+      date: "Apr 15",
+      status: "flat",
+      summary: "High quality comments, slower share curve.",
+      values: {
+        likes: [8, 13, 16, 18, 19, 20, 21],
+        comments: [6, 9, 11, 12, 13, 13, 14],
+        shares: [3, 5, 6, 7, 7, 8, 8],
+        watchTime: [6, 8, 10, 12, 13, 14, 14],
+      },
+    },
+  ],
+};
+
 function PlatformMetrics() {
+  const [selectedPlatformName, setSelectedPlatformName] = useState<string | null>(null);
+  const selectedPlatform = PLATFORM_METRICS.find(
+    (platform) => platform.name === selectedPlatformName,
+  );
+  const scrollToMetricsTop = () => {
+    requestAnimationFrame(() => window.scrollTo({ top: 0, behavior: "smooth" }));
+  };
+  const openPlatform = (platformName: string) => {
+    setSelectedPlatformName(platformName);
+    scrollToMetricsTop();
+  };
+  const closePlatform = () => {
+    setSelectedPlatformName(null);
+    scrollToMetricsTop();
+  };
+
+  if (selectedPlatform) {
+    return <PlatformMetricDetail platform={selectedPlatform} onBack={closePlatform} />;
+  }
+
   return (
     <div className="min-h-screen px-6 py-8 md:px-8">
       <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
@@ -530,18 +755,39 @@ function PlatformMetrics() {
 
       <div className="mt-8 grid grid-cols-1 gap-5 lg:grid-cols-2 xl:grid-cols-3">
         {PLATFORM_METRICS.map((platform) => (
-          <PlatformMetricWindow key={platform.name} platform={platform} />
+          <PlatformMetricWindow
+            key={platform.name}
+            platform={platform}
+            onOpen={() => openPlatform(platform.name)}
+          />
         ))}
       </div>
     </div>
   );
 }
 
-function PlatformMetricWindow({ platform }: { platform: (typeof PLATFORM_METRICS)[number] }) {
+function PlatformMetricWindow({
+  platform,
+  onOpen,
+}: {
+  platform: (typeof PLATFORM_METRICS)[number];
+  onOpen: () => void;
+}) {
   const Icon = platform.Icon;
 
   return (
-    <section className="glass-card group flex min-h-[430px] flex-col overflow-hidden rounded-2xl transition hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-2xl hover:shadow-primary/10">
+    <section
+      role="button"
+      tabIndex={0}
+      onClick={onOpen}
+      onKeyDown={(event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          onOpen();
+        }
+      }}
+      className="glass-card group flex min-h-[430px] cursor-pointer flex-col overflow-hidden rounded-2xl transition hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-2xl hover:shadow-primary/10 focus:outline-none focus:ring-2 focus:ring-primary/50"
+    >
       <div className={`h-1.5 bg-gradient-to-r ${platform.color}`} />
       <div className="flex flex-1 flex-col p-5">
         <div className="flex items-start justify-between gap-4">
@@ -591,12 +837,350 @@ function PlatformMetricWindow({ platform }: { platform: (typeof PLATFORM_METRICS
           <span className={`text-xs font-semibold uppercase tracking-wider ${platform.accent}`}>
             Weekly summary
           </span>
-          <button className="inline-flex items-center gap-1.5 text-xs font-semibold text-primary transition hover:text-primary/80">
+          <button
+            onClick={(event) => {
+              event.stopPropagation();
+              onOpen();
+            }}
+            className="inline-flex items-center gap-1.5 text-xs font-semibold text-primary transition hover:text-primary/80"
+          >
             View report <ArrowRight className="h-3.5 w-3.5" />
           </button>
         </div>
       </div>
     </section>
+  );
+}
+
+function PlatformMetricDetail({
+  platform,
+  onBack,
+}: {
+  platform: (typeof PLATFORM_METRICS)[number];
+  onBack: () => void;
+}) {
+  const [selectedMetric, setSelectedMetric] = useState<MetricKey>("likes");
+  const posts = POST_PERFORMANCE[platform.name] ?? [];
+  const visiblePosts = posts.slice(0, 5);
+  const selectedMetricLabel =
+    METRIC_OPTIONS.find((option) => option.key === selectedMetric)?.label ?? "Metric";
+
+  return (
+    <div className="min-h-screen px-6 py-8 md:px-8">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div>
+          <button
+            onClick={onBack}
+            className="mb-4 inline-flex items-center gap-2 text-sm font-semibold text-primary transition hover:text-primary/80"
+          >
+            <ArrowLeft className="h-4 w-4" /> All platforms
+          </button>
+          <div className="flex items-center gap-4">
+            <div
+              className={`grid h-12 w-12 place-items-center rounded-xl bg-gradient-to-br ${platform.color} shadow-lg shadow-black/25`}
+            >
+              <platform.Icon className="h-6 w-6 text-white" />
+            </div>
+            <Header
+              title={`${platform.name} Post Performance`}
+              subtitle="Track top posts by lifecycle day, metric movement, and post-level momentum."
+            />
+          </div>
+        </div>
+        <button
+          onClick={() => toast.success(`${platform.name} post draft opened`)}
+          className="inline-flex w-fit items-center justify-center gap-2 rounded-xl bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/30 transition hover:brightness-110"
+        >
+          <Plus className="h-4 w-4" /> Post
+        </button>
+      </div>
+
+      <div className="mt-8 grid grid-cols-1 gap-4 md:grid-cols-4">
+        {platform.metrics.slice(0, 4).map((metric) => (
+          <Kpi
+            key={metric.label}
+            icon={metric.icon}
+            label={metric.label}
+            value={metric.value}
+            trend={metric.delta}
+          />
+        ))}
+      </div>
+
+      <div className="mt-8 grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
+        <section className="glass-card rounded-2xl p-5">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <h3 className="text-xl font-semibold tracking-tight">
+                {selectedMetricLabel} over time
+              </h3>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Comparing top posts by days since publish keeps posts with different dates fair.
+              </p>
+            </div>
+            <div className="grid grid-cols-2 gap-2 sm:flex">
+              {METRIC_OPTIONS.map((option) => (
+                <button
+                  key={option.key}
+                  onClick={() => setSelectedMetric(option.key)}
+                  className={`inline-flex items-center justify-center gap-2 rounded-xl px-3 py-2 text-xs font-semibold transition ${
+                    selectedMetric === option.key
+                      ? "bg-primary text-primary-foreground shadow shadow-primary/30"
+                      : "border border-border bg-secondary/30 text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  <option.icon className="h-3.5 w-3.5" /> {option.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <PostTrendChart posts={visiblePosts} metricKey={selectedMetric} />
+
+          <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-border pt-4 text-xs text-muted-foreground">
+            <span className="rounded-full bg-primary/10 px-2.5 py-1 font-semibold text-primary">
+              Showing top {visiblePosts.length}
+            </span>
+            <span>Use the list to pin a focused set when a platform has many posts.</span>
+          </div>
+        </section>
+
+        <section className="glass-card rounded-2xl p-5">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <h3 className="text-lg font-semibold tracking-tight">Tracked posts</h3>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Top posts are plotted by default.
+              </p>
+            </div>
+            <span className="rounded-full border border-border bg-secondary/40 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+              Top 5
+            </span>
+          </div>
+
+          <div className="mt-5 space-y-3">
+            {posts.map((post, index) => {
+              const firstValue = post.values[selectedMetric][0];
+              const lastValue = post.values[selectedMetric].at(-1) ?? firstValue;
+              const movement = lastValue - firstValue;
+              return (
+                <div
+                  key={post.title}
+                  className="rounded-xl border border-border bg-secondary/30 p-3"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="grid h-6 w-6 shrink-0 place-items-center rounded-md bg-primary/15 text-[11px] font-semibold text-primary">
+                          {index + 1}
+                        </span>
+                        <div className="truncate text-sm font-semibold">{post.title}</div>
+                      </div>
+                      <div className="mt-1 text-xs text-muted-foreground">
+                        {post.type} · posted {post.date}
+                      </div>
+                    </div>
+                    <TrendBadge status={post.status} value={movement} />
+                  </div>
+                  <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
+                    {post.summary}
+                  </p>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      </div>
+    </div>
+  );
+}
+
+function PostTrendChart({
+  posts,
+  metricKey,
+}: {
+  posts: (typeof POST_PERFORMANCE)[string];
+  metricKey: MetricKey;
+}) {
+  const days = ["Day 0", "Day 1", "Day 2", "Day 3", "Day 4", "Day 5", "Day 6"];
+  const allValues = posts.flatMap((post) => post.values[metricKey]);
+  const maxValue = Math.max(...allValues, 1);
+  const minValue = Math.min(...allValues, 0);
+  const range = Math.max(maxValue - minValue, 1);
+  const width = 760;
+  const height = 360;
+  const padding = { top: 28, right: 28, bottom: 52, left: 54 };
+  const plotWidth = width - padding.left - padding.right;
+  const plotHeight = height - padding.top - padding.bottom;
+  const colors = ["#a855f7", "#22d3ee", "#f472b6", "#34d399", "#f59e0b"];
+
+  const getPoint = (value: number, index: number) => {
+    const x = padding.left + (index / (days.length - 1)) * plotWidth;
+    const y = padding.top + (1 - (value - minValue) / range) * plotHeight;
+    return { x, y };
+  };
+
+  return (
+    <div className="mt-6 overflow-x-auto">
+      <div className="min-w-[760px]">
+        <svg viewBox={`0 0 ${width} ${height}`} className="h-auto w-full">
+          <line
+            x1={padding.left}
+            y1={padding.top}
+            x2={padding.left}
+            y2={padding.top + plotHeight}
+            className="stroke-border"
+            strokeWidth="2"
+          />
+          <line
+            x1={padding.left}
+            y1={padding.top + plotHeight}
+            x2={padding.left + plotWidth}
+            y2={padding.top + plotHeight}
+            className="stroke-border"
+            strokeWidth="2"
+          />
+
+          {[0, 1, 2, 3].map((step) => {
+            const value = minValue + (range / 3) * step;
+            const y = padding.top + plotHeight - (step / 3) * plotHeight;
+            return (
+              <g key={step}>
+                <line
+                  x1={padding.left}
+                  y1={y}
+                  x2={padding.left + plotWidth}
+                  y2={y}
+                  className="stroke-border/60"
+                  strokeDasharray="4 8"
+                />
+                <text
+                  x={padding.left - 12}
+                  y={y + 4}
+                  textAnchor="end"
+                  className="fill-muted-foreground text-[11px]"
+                >
+                  {Math.round(value)}
+                </text>
+              </g>
+            );
+          })}
+
+          {days.map((day, index) => {
+            const x = padding.left + (index / (days.length - 1)) * plotWidth;
+            return (
+              <g key={day}>
+                <line
+                  x1={x}
+                  y1={padding.top}
+                  x2={x}
+                  y2={padding.top + plotHeight}
+                  className="stroke-muted-foreground/30"
+                  strokeDasharray="6 8"
+                />
+                <text
+                  x={x}
+                  y={height - 18}
+                  textAnchor="middle"
+                  className="fill-muted-foreground text-[12px]"
+                >
+                  {day}
+                </text>
+              </g>
+            );
+          })}
+
+          {posts.map((post, postIndex) => {
+            const points = post.values[metricKey].map(getPoint);
+            const path = points.map((point) => `${point.x},${point.y}`).join(" ");
+            const color = colors[postIndex % colors.length];
+            return (
+              <g key={post.title}>
+                <polyline
+                  points={path}
+                  fill="none"
+                  stroke={color}
+                  strokeWidth="3"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeDasharray={postIndex % 2 ? "8 8" : undefined}
+                />
+                {points.map((point, pointIndex) => {
+                  const current = post.values[metricKey][pointIndex];
+                  const previous = post.values[metricKey][Math.max(0, pointIndex - 1)];
+                  const delta = current - previous;
+                  return (
+                    <g key={`${post.title}-${pointIndex}`} className="group">
+                      <circle
+                        cx={point.x}
+                        cy={point.y}
+                        r="6"
+                        fill={color}
+                        className="cursor-pointer stroke-background"
+                        strokeWidth="3"
+                      />
+                      <foreignObject
+                        x={Math.min(point.x + 12, width - 190)}
+                        y={Math.max(point.y - 82, 8)}
+                        width="176"
+                        height="72"
+                        className="pointer-events-none opacity-0 transition group-hover:opacity-100"
+                      >
+                        <div className="rounded-xl border border-border bg-background/95 p-3 text-xs shadow-xl shadow-black/30">
+                          <div className="truncate font-semibold text-foreground">{post.title}</div>
+                          <div className="mt-1 text-muted-foreground">
+                            {days[pointIndex]} · {current}
+                          </div>
+                          <div className="mt-2 flex items-center gap-1 text-emerald-300">
+                            {delta > 0 ? (
+                              <TrendingUp className="h-3 w-3" />
+                            ) : delta < 0 ? (
+                              <TrendingDown className="h-3 w-3 text-rose-300" />
+                            ) : (
+                              <Minus className="h-3 w-3 text-muted-foreground" />
+                            )}
+                            <span
+                              className={
+                                delta < 0
+                                  ? "text-rose-300"
+                                  : delta === 0
+                                    ? "text-muted-foreground"
+                                    : ""
+                              }
+                            >
+                              {delta > 0 ? "+" : ""}
+                              {delta} from previous day
+                            </span>
+                          </div>
+                        </div>
+                      </foreignObject>
+                    </g>
+                  );
+                })}
+              </g>
+            );
+          })}
+        </svg>
+      </div>
+    </div>
+  );
+}
+
+function TrendBadge({ status, value }: { status: "up" | "down" | "flat"; value: number }) {
+  const content =
+    status === "up"
+      ? { icon: TrendingUp, className: "bg-emerald-400/10 text-emerald-300", label: `+${value}` }
+      : status === "down"
+        ? { icon: TrendingDown, className: "bg-rose-400/10 text-rose-300", label: `${value}` }
+        : { icon: Minus, className: "bg-muted/40 text-muted-foreground", label: "Flat" };
+  const Icon = content.icon;
+
+  return (
+    <span
+      className={`inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-1 text-[11px] font-semibold ${content.className}`}
+    >
+      <Icon className="h-3 w-3" /> {content.label}
+    </span>
   );
 }
 
