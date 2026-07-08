@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState, useMemo, useEffect, type ReactNode } from "react";
+import { useState, useMemo, useEffect, useRef, type ReactNode } from "react";
 import { toast } from "sonner";
 import {
   LayoutDashboard,
@@ -35,7 +35,6 @@ import {
   ImageIcon,
   Video,
   FileText,
-  PanelLeftClose,
   PanelRightClose,
   Plus,
   Heart,
@@ -1489,6 +1488,53 @@ function Composer({
     linkedin: true,
   });
   const [uploadedVideo, setUploadedVideo] = useState<string | null>(null);
+  const composerShellRef = useRef<HTMLDivElement>(null);
+  const [composerColumns, setComposerColumns] = useState({ left: 26, right: 26 });
+  const centerColumn = 100 - composerColumns.left - composerColumns.right;
+  const clampColumn = (value: number, min: number, max: number) =>
+    Math.min(Math.max(value, min), max);
+  const resetComposerColumns = () => setComposerColumns({ left: 26, right: 26 });
+
+  const startColumnResize = (
+    divider: "left" | "right",
+    event: React.PointerEvent<HTMLButtonElement>,
+  ) => {
+    event.preventDefault();
+    event.currentTarget.setPointerCapture(event.pointerId);
+
+    const updateColumns = (clientX: number) => {
+      const shell = composerShellRef.current;
+      if (!shell) return;
+
+      const bounds = shell.getBoundingClientRect();
+      const pointerPercent = ((clientX - bounds.left) / bounds.width) * 100;
+
+      setComposerColumns((current) => {
+        if (divider === "left") {
+          return {
+            ...current,
+            left: clampColumn(pointerPercent, 18, 100 - current.right - 34),
+          };
+        }
+
+        return {
+          ...current,
+          right: clampColumn(100 - pointerPercent, 18, 100 - current.left - 34),
+        };
+      });
+    };
+
+    updateColumns(event.clientX);
+
+    const onPointerMove = (moveEvent: PointerEvent) => updateColumns(moveEvent.clientX);
+    const onPointerUp = () => {
+      window.removeEventListener("pointermove", onPointerMove);
+      window.removeEventListener("pointerup", onPointerUp);
+    };
+
+    window.addEventListener("pointermove", onPointerMove);
+    window.addEventListener("pointerup", onPointerUp, { once: true });
+  };
 
   const onUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
@@ -1504,9 +1550,19 @@ function Composer({
   };
 
   return (
-    <div className="grid min-h-screen grid-cols-1 bg-background text-foreground lg:h-screen lg:grid-cols-[26%_48%_26%]">
+    <div
+      ref={composerShellRef}
+      className="grid min-h-screen grid-cols-1 bg-background text-foreground lg:h-screen lg:[grid-template-columns:minmax(220px,var(--composer-left))_4px_minmax(360px,var(--composer-center))_4px_minmax(260px,var(--composer-right))]"
+      style={
+        {
+          "--composer-left": `${composerColumns.left}%`,
+          "--composer-center": `${centerColumn}%`,
+          "--composer-right": `${composerColumns.right}%`,
+        } as React.CSSProperties
+      }
+    >
       {/* LEFT */}
-      <div className="relative flex h-auto flex-col overflow-y-auto border-r-2 border-primary bg-card p-7 lg:h-screen">
+      <div className="relative flex h-auto flex-col overflow-y-auto bg-card p-7 lg:h-screen">
         <div className="flex items-center justify-between">
           <h3 className="text-base font-bold tracking-tight text-foreground">AI Idea Engine</h3>
           <button
@@ -1579,11 +1635,13 @@ function Composer({
             </button>
           ))}
         </div>
-
-        <button className="absolute right-[-17px] top-1/2 z-10 grid h-11 w-8 -translate-y-1/2 place-items-center rounded-full bg-card text-foreground shadow-md">
-          <PanelLeftClose className="h-4 w-4" />
-        </button>
       </div>
+
+      <ComposerResizeHandle
+        label="Resize idea engine and canvas"
+        onPointerDown={(event) => startColumnResize("left", event)}
+        onReset={resetComposerColumns}
+      />
 
       {/* CENTER */}
       <div className="flex min-h-screen flex-col overflow-y-auto bg-muted px-6 py-6 lg:h-screen">
@@ -1689,11 +1747,14 @@ function Composer({
         )}
       </div>
 
+      <ComposerResizeHandle
+        label="Resize canvas and publish settings"
+        onPointerDown={(event) => startColumnResize("right", event)}
+        onReset={resetComposerColumns}
+      />
+
       {/* RIGHT */}
-      <div className="relative flex h-auto flex-col overflow-y-auto border-l-2 border-primary bg-card p-7 lg:h-screen">
-        <button className="absolute left-[-17px] top-1/2 z-10 grid h-11 w-8 -translate-y-1/2 place-items-center rounded-full bg-card text-foreground shadow-md">
-          <PanelRightClose className="h-4 w-4" />
-        </button>
+      <div className="relative flex h-auto flex-col overflow-y-auto bg-card p-7 lg:h-screen">
         <h3 className="text-base font-bold tracking-tight text-foreground">Publish Settings</h3>
         <label className="mt-5 block text-base font-bold text-foreground">Caption</label>
         <textarea
@@ -1767,6 +1828,31 @@ function Composer({
         </button>
       </div>
     </div>
+  );
+}
+
+function ComposerResizeHandle({
+  label,
+  onPointerDown,
+  onReset,
+}: {
+  label: string;
+  onPointerDown: (event: React.PointerEvent<HTMLButtonElement>) => void;
+  onReset: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      title="Drag to resize. Double-click to reset."
+      onPointerDown={onPointerDown}
+      onDoubleClick={onReset}
+      className="group relative z-20 hidden cursor-col-resize touch-none items-center justify-center bg-primary outline-none transition hover:brightness-110 focus-visible:ring-2 focus-visible:ring-primary/50 lg:flex"
+    >
+      <span className="absolute left-1/2 top-1/2 grid h-12 w-8 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full bg-card text-foreground shadow-md transition group-hover:scale-105 group-active:scale-95">
+        <SlidersHorizontal className="h-4 w-4 rotate-90" />
+      </span>
+    </button>
   );
 }
 
