@@ -38,16 +38,56 @@
   --color-sidebar-ring: var(--sidebar-ring);
 }
 
-/* OmniForge dark palette — applied to :root since app is dark-by-default */
+/*
+ * OmniForge theming
+ * LIGHT is the default (:root) — derived from the Post Composer's look & feel
+ *   (soft #eef0f4 canvas, white cards, #9258ee electric purple).
+ * DARK (.dark) — the original deep-slate / purple palette from the Metrics &
+ *   Calendar pages. Toggled by adding the `dark` class to <html>.
+ * The whole app is token-driven, so new pages inherit both themes automatically.
+ */
 :root {
   --radius: 0.75rem;
-  --background: oklch(0.205 0.04 265);          /* #0F172A deep slate */
+
+  /* LIGHT — Post Composer palette */
+  --background: #eef0f4; /* soft canvas */
+  --foreground: #16151c; /* near-black text */
+  --card: #ffffff; /* white surfaces */
+  --card-foreground: #16151c;
+  --popover: #ffffff;
+  --popover-foreground: #16151c;
+  --primary: #9258ee; /* electric purple */
+  --primary-foreground: #ffffff;
+  --secondary: #e9ebf0; /* subtle inset gray */
+  --secondary-foreground: #16151c;
+  --muted: #e9ebf0;
+  --muted-foreground: #6b6e79; /* soft gray label text */
+  --accent: #e9ebf0; /* neutral hover fill */
+  --accent-foreground: #16151c;
+  --destructive: #dc2626;
+  --destructive-foreground: #ffffff;
+  --border: #d9dbe2;
+  --input: #d9dbe2;
+  --ring: #9258ee;
+  --sidebar: #ffffff; /* top nav bar */
+  --sidebar-foreground: #16151c;
+  --sidebar-primary: #9258ee;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #eef0f4; /* nav item hover */
+  --sidebar-accent-foreground: #16151c;
+  --sidebar-border: #e4e6ec;
+  --sidebar-ring: #9258ee;
+}
+
+.dark {
+  /* DARK — original deep-slate / purple palette (Metrics & Calendar) */
+  --background: oklch(0.205 0.04 265); /* #0F172A deep slate */
   --foreground: oklch(0.985 0 0);
-  --card: oklch(0.245 0.035 265);               /* slightly lighter slate */
+  --card: oklch(0.245 0.035 265); /* slightly lighter slate */
   --card-foreground: oklch(0.985 0 0);
   --popover: oklch(0.245 0.035 265);
   --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.62 0.21 295);              /* #7F56D9 electric purple */
+  --primary: oklch(0.62 0.21 295); /* #7F56D9 electric purple */
   --primary-foreground: oklch(0.99 0 0);
   --secondary: oklch(0.29 0.04 265);
   --secondary-foreground: oklch(0.985 0 0);
@@ -71,13 +111,41 @@
 }
 
 @layer base {
-  * { border-color: var(--color-border); }
-  html, body { background-color: var(--color-background); color: var(--color-foreground); }
-  body { font-family: ui-sans-serif, system-ui, -apple-system, "Inter", sans-serif; }
+  * {
+    border-color: var(--color-border);
+  }
+  html,
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+  }
+  body {
+    font-family:
+      ui-sans-serif,
+      system-ui,
+      -apple-system,
+      "Inter",
+      sans-serif;
+  }
+  /* Smooth cross-fade when switching light/dark */
+  *,
+  *::before,
+  *::after {
+    transition-property: background-color, border-color, color, fill, stroke, box-shadow;
+    transition-duration: 200ms;
+    transition-timing-function: ease;
+  }
 }
 
+/* Cards: solid white in light mode (Composer look), translucent glass in dark */
 @utility glass-card {
-  background: linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.01));
-  border: 1px solid rgba(255,255,255,0.08);
+  background: #ffffff;
+  border: 1px solid #e6e8ee;
+  box-shadow: 0 2px 8px rgba(26, 24, 35, 0.08);
+}
+.dark .glass-card {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.01));
+  border: 1px solid rgba(255, 255, 255, 0.08);
   backdrop-filter: blur(12px);
+  box-shadow: none;
 }
