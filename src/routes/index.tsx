@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState, useMemo, type ReactNode } from "react";
+import { useState, useMemo, useEffect, type ReactNode } from "react";
 import { toast } from "sonner";
 import {
   LayoutDashboard,
@@ -53,6 +53,8 @@ import {
   Eye,
   Minus,
   TrendingDown,
+  Moon,
+  Sun,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -217,11 +219,27 @@ const AI_CLIPS = [
 ];
 
 // ---------- ROOT ----------
+type Theme = "light" | "dark";
+
 function OmniForgeApp() {
   const [authed, setAuthed] = useState(false);
   const [view, setView] = useState<View>("metrics");
   const [composerSeed, setComposerSeed] = useState<ComposerSeed | null>(null);
   const [calendar, setCalendar] = useState(INITIAL_CALENDAR);
+  // Light is the default (what users see on first login); choice persists.
+  const [theme, setTheme] = useState<Theme>("light");
+
+  useEffect(() => {
+    const saved = localStorage.getItem("omniforge-theme");
+    if (saved === "light" || saved === "dark") setTheme(saved);
+  }, []);
+
+  useEffect(() => {
+    document.documentElement.classList.toggle("dark", theme === "dark");
+    localStorage.setItem("omniforge-theme", theme);
+  }, [theme]);
+
+  const toggleTheme = () => setTheme((t) => (t === "light" ? "dark" : "light"));
 
   const navigate = (v: View, seed?: ComposerSeed) => {
     if (seed) setComposerSeed(seed);
@@ -232,7 +250,7 @@ function OmniForgeApp() {
 
   return (
     <div className="flex min-h-screen w-full flex-col bg-background text-foreground">
-      <TopNav view={view} navigate={navigate} />
+      <TopNav view={view} navigate={navigate} theme={theme} toggleTheme={toggleTheme} />
       <main className="flex-1 overflow-x-hidden">
         <div key={view} className="animate-in fade-in slide-in-from-bottom-2 duration-300">
           {view === "metrics" && <PlatformMetrics />}
@@ -325,9 +343,13 @@ function PasswordWall({ onUnlock }: { onUnlock: () => void }) {
 function TopNav({
   view,
   navigate,
+  theme,
+  toggleTheme,
 }: {
   view: View;
   navigate: (v: View, seed?: ComposerSeed) => void;
+  theme: Theme;
+  toggleTheme: () => void;
 }) {
   const navItems: { id: View; label: string; icon: typeof LayoutDashboard }[] = [
     { id: "composer", label: "Post Composer", icon: Wand2 },
@@ -411,13 +433,26 @@ function TopNav({
         ))}
       </nav>
 
-      {/* Create → AI Idea Engine */}
-      <button
-        onClick={() => navigate("ideas")}
-        className="ml-auto inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/30 transition hover:brightness-110"
-      >
-        <Sparkles className="h-4 w-4" /> Create
-      </button>
+      {/* Right cluster: theme toggle + Create */}
+      <div className="ml-auto flex items-center gap-2">
+        {/* Moon in light mode (→ dark), Sun in dark mode (→ light) */}
+        <button
+          onClick={toggleTheme}
+          aria-label={theme === "light" ? "Switch to dark mode" : "Switch to light mode"}
+          title={theme === "light" ? "Switch to dark mode" : "Switch to light mode"}
+          className="inline-flex h-9 w-9 items-center justify-center rounded-xl text-muted-foreground transition hover:bg-sidebar-accent hover:text-foreground"
+        >
+          {theme === "light" ? <Moon className="h-5 w-5" /> : <Sun className="h-5 w-5" />}
+        </button>
+
+        {/* Create → AI Idea Engine */}
+        <button
+          onClick={() => navigate("ideas")}
+          className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/30 transition hover:brightness-110"
+        >
+          <Sparkles className="h-4 w-4" /> Create
+        </button>
+      </div>
     </header>
   );
 }
@@ -1469,42 +1504,42 @@ function Composer({
   };
 
   return (
-    <div className="grid min-h-screen grid-cols-1 bg-[#eef0f4] text-[#16151c] lg:h-screen lg:grid-cols-[26%_48%_26%]">
+    <div className="grid min-h-screen grid-cols-1 bg-background text-foreground lg:h-screen lg:grid-cols-[26%_48%_26%]">
       {/* LEFT */}
-      <div className="relative flex h-auto flex-col overflow-y-auto border-r-2 border-[#9258ff] bg-[#f8f9fb] p-7 lg:h-screen">
+      <div className="relative flex h-auto flex-col overflow-y-auto border-r-2 border-primary bg-card p-7 lg:h-screen">
         <div className="flex items-center justify-between">
-          <h3 className="text-base font-bold tracking-tight text-[#33333a]">AI Idea Engine</h3>
+          <h3 className="text-base font-bold tracking-tight text-foreground">AI Idea Engine</h3>
           <button
             onClick={onExplore}
-            className="inline-flex items-center gap-1 text-sm font-semibold text-[#9258ff] transition hover:text-[#7a42ed]"
+            className="inline-flex items-center gap-1 text-sm font-semibold text-primary transition hover:text-primary/80"
           >
             Explore All <ArrowRight className="h-3.5 w-3.5" />
           </button>
         </div>
 
-        <section className="mt-5 rounded-[20px] bg-white p-7 shadow-[0_2px_8px_rgba(26,24,35,0.16)]">
+        <section className="mt-5 rounded-[20px] bg-card p-7 shadow-[0_2px_8px_rgba(26,24,35,0.16)]">
           <div className="flex items-center justify-between">
-            <h4 className="text-base font-bold text-black">Ideas</h4>
-            <ChevronDown className="h-4 w-4 text-[#9258ff]" />
+            <h4 className="text-base font-bold text-foreground">Ideas</h4>
+            <ChevronDown className="h-4 w-4 text-primary" />
           </div>
-          <button className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#9258ee] px-5 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-[#824be0]">
+          <button className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-5 py-3 text-sm font-bold text-white shadow-sm transition hover:brightness-110">
             <Sparkles className="h-4 w-4" /> Generate
           </button>
         </section>
 
-        <h3 className="mt-8 text-base font-bold tracking-tight text-[#3d3d42]">Source</h3>
-        <label className="mt-4 flex min-h-36 cursor-pointer flex-col items-center justify-center gap-2 rounded-[18px] border-2 border-dashed border-[#8f929c] bg-[#f7f8fb] p-6 text-center transition hover:border-[#9258ff] hover:bg-white">
-          <Upload className="h-8 w-8 text-[#a77cf3]" />
-          <span className="text-sm font-bold text-[#1f1f24]">
+        <h3 className="mt-8 text-base font-bold tracking-tight text-foreground">Source</h3>
+        <label className="mt-4 flex min-h-36 cursor-pointer flex-col items-center justify-center gap-2 rounded-[18px] border-2 border-dashed border-border bg-card p-6 text-center transition hover:border-primary hover:bg-card">
+          <Upload className="h-8 w-8 text-primary" />
+          <span className="text-sm font-bold text-foreground">
             {uploadedVideo ?? "Drop long-form source video"}
           </span>
-          <span className="text-sm font-bold text-[#72747a]">.mp4, .mov up to 2GB</span>
+          <span className="text-sm font-bold text-muted-foreground">.mp4, .mov up to 2GB</span>
           <input type="file" accept="video/*" className="hidden" onChange={onUpload} />
         </label>
 
         <div className="mt-8 flex items-center justify-between">
-          <h3 className="text-base font-bold tracking-tight text-[#222228]">Asset Library</h3>
-          <button className="text-sm font-semibold text-[#9258ff] transition hover:text-[#7a42ed]">
+          <h3 className="text-base font-bold tracking-tight text-foreground">Asset Library</h3>
+          <button className="text-sm font-semibold text-primary transition hover:text-primary/80">
             Edit Library
           </button>
         </div>
@@ -1540,19 +1575,19 @@ function Composer({
               >
                 <asset.icon className="h-7 w-7" />
               </span>
-              <span className="text-xs text-[#33343a]">{asset.label}</span>
+              <span className="text-xs text-foreground">{asset.label}</span>
             </button>
           ))}
         </div>
 
-        <button className="absolute right-[-17px] top-1/2 z-10 grid h-11 w-8 -translate-y-1/2 place-items-center rounded-full bg-white text-black shadow-md">
+        <button className="absolute right-[-17px] top-1/2 z-10 grid h-11 w-8 -translate-y-1/2 place-items-center rounded-full bg-card text-foreground shadow-md">
           <PanelLeftClose className="h-4 w-4" />
         </button>
       </div>
 
       {/* CENTER */}
-      <div className="flex min-h-screen flex-col overflow-y-auto bg-[#e9ebf0] px-6 py-6 lg:h-screen">
-        <div className="mx-auto flex w-full max-w-md items-center rounded-xl border border-[#d9dbe2] bg-white/80 p-1 shadow-sm">
+      <div className="flex min-h-screen flex-col overflow-y-auto bg-muted px-6 py-6 lg:h-screen">
+        <div className="mx-auto flex w-full max-w-md items-center rounded-xl border border-border bg-card/80 p-1 shadow-sm">
           {(
             [
               { id: "canvas", label: "Canvas Preview" },
@@ -1562,7 +1597,7 @@ function Composer({
             <button
               key={t.id}
               onClick={() => setTab(t.id)}
-              className={`flex-1 rounded-lg px-3 py-2 text-xs font-semibold transition ${tab === t.id ? "bg-[#9258ee] text-white shadow shadow-[#9258ee]/25" : "text-[#7b7d86] hover:text-[#16151c]"}`}
+              className={`flex-1 rounded-lg px-3 py-2 text-xs font-semibold transition ${tab === t.id ? "bg-primary text-white shadow shadow-primary/25" : "text-muted-foreground hover:text-foreground"}`}
             >
               {t.label}
             </button>
@@ -1571,7 +1606,7 @@ function Composer({
 
         {tab === "canvas" ? (
           <div className="mt-6 flex flex-1 flex-col items-center justify-center">
-            <h2 className="mb-5 text-center text-2xl font-black text-black">9:16 Reel</h2>
+            <h2 className="mb-5 text-center text-2xl font-black text-foreground">9:16 Reel</h2>
             <div className="relative aspect-[9/16] w-full max-w-[368px] overflow-hidden rounded-[22px] shadow-[0_14px_30px_rgba(0,0,0,0.2)]">
               <img
                 src={selectedAsset}
@@ -1583,12 +1618,12 @@ function Composer({
                 <textarea
                   value={overlayText}
                   onChange={(e) => setOverlayText(e.target.value)}
-                  className="w-full resize-none rounded-xl border border-white/30 bg-black/35 p-3 text-center text-2xl font-black leading-tight text-white outline-none backdrop-blur-md focus:border-[#9258ff]"
+                  className="w-full resize-none rounded-xl border border-white/30 bg-black/35 p-3 text-center text-2xl font-black leading-tight text-white outline-none backdrop-blur-md focus:border-primary"
                   rows={2}
                 />
               </div>
             </div>
-            <div className="mt-7 flex h-12 w-full max-w-[520px] items-center justify-between rounded-2xl bg-white px-5 text-black shadow-[0_2px_8px_rgba(20,20,26,0.25)]">
+            <div className="mt-7 flex h-12 w-full max-w-[520px] items-center justify-between rounded-2xl bg-card px-5 text-foreground shadow-[0_2px_8px_rgba(20,20,26,0.25)]">
               {[
                 Music2,
                 Type,
@@ -1602,7 +1637,7 @@ function Composer({
               ].map((Icon, index) => (
                 <button
                   key={index}
-                  className="grid h-9 w-9 place-items-center rounded-lg transition hover:bg-[#f0ebff]"
+                  className="grid h-9 w-9 place-items-center rounded-lg transition hover:bg-primary/10"
                   aria-label="Editor tool"
                 >
                   <Icon className="h-5 w-5" />
@@ -1612,7 +1647,7 @@ function Composer({
           </div>
         ) : (
           <div className="mt-6 space-y-3">
-            <p className="text-xs text-[#666975]">
+            <p className="text-xs text-muted-foreground">
               3 AI-generated short clips from your source video. Click to preview in canvas.
             </p>
             {AI_CLIPS.map((c, i) => (
@@ -1623,7 +1658,7 @@ function Composer({
                   setTab("canvas");
                   toast(`Loaded ${c.name} into canvas`);
                 }}
-                className="group flex w-full items-center gap-4 rounded-xl border border-[#d9dbe2] bg-white p-3 text-left shadow-sm transition hover:border-[#9258ff]"
+                className="group flex w-full items-center gap-4 rounded-xl border border-border bg-card p-3 text-left shadow-sm transition hover:border-primary"
               >
                 <div className="relative h-20 w-32 shrink-0 overflow-hidden rounded-lg">
                   <img
@@ -1639,15 +1674,15 @@ function Composer({
                   </span>
                 </div>
                 <div className="min-w-0 flex-1">
-                  <div className="text-[11px] font-semibold uppercase tracking-wider text-[#9258ff]">
+                  <div className="text-[11px] font-semibold uppercase tracking-wider text-primary">
                     Clip {i + 1}
                   </div>
                   <div className="text-sm font-semibold">{c.name}</div>
-                  <div className="text-xs text-[#666975]">
+                  <div className="text-xs text-muted-foreground">
                     Optimal {c.duration} cut · 92% hook score
                   </div>
                 </div>
-                <ArrowRight className="h-4 w-4 text-[#666975] transition group-hover:text-[#9258ff]" />
+                <ArrowRight className="h-4 w-4 text-muted-foreground transition group-hover:text-primary" />
               </button>
             ))}
           </div>
@@ -1655,22 +1690,22 @@ function Composer({
       </div>
 
       {/* RIGHT */}
-      <div className="relative flex h-auto flex-col overflow-y-auto border-l-2 border-[#9258ff] bg-[#f8f9fb] p-7 lg:h-screen">
-        <button className="absolute left-[-17px] top-1/2 z-10 grid h-11 w-8 -translate-y-1/2 place-items-center rounded-full bg-white text-black shadow-md">
+      <div className="relative flex h-auto flex-col overflow-y-auto border-l-2 border-primary bg-card p-7 lg:h-screen">
+        <button className="absolute left-[-17px] top-1/2 z-10 grid h-11 w-8 -translate-y-1/2 place-items-center rounded-full bg-card text-foreground shadow-md">
           <PanelRightClose className="h-4 w-4" />
         </button>
-        <h3 className="text-base font-bold tracking-tight text-[#3d3d42]">Publish Settings</h3>
-        <label className="mt-5 block text-base font-bold text-[#3d3d42]">Caption</label>
+        <h3 className="text-base font-bold tracking-tight text-foreground">Publish Settings</h3>
+        <label className="mt-5 block text-base font-bold text-foreground">Caption</label>
         <textarea
           value={caption}
           onChange={(e) => setCaption(e.target.value)}
-          className="mt-4 min-h-[158px] w-full resize-none rounded-[20px] border-0 bg-white p-5 text-sm font-bold text-[#1f1f24] shadow-[0_2px_8px_rgba(26,24,35,0.16)] outline-none focus:ring-2 focus:ring-[#9258ff]/40"
+          className="mt-4 min-h-[158px] w-full resize-none rounded-[20px] border-0 bg-card p-5 text-sm font-bold text-foreground shadow-[0_2px_8px_rgba(26,24,35,0.16)] outline-none focus:ring-2 focus:ring-primary/40"
         />
 
         <div className="mt-6">
           <div className="flex items-center justify-between">
-            <div className="text-base font-bold text-[#3d3d42]">Edit Post Size & Send</div>
-            <button className="text-sm font-semibold text-[#9258ff] transition hover:text-[#7a42ed]">
+            <div className="text-base font-bold text-foreground">Edit Post Size & Send</div>
+            <button className="text-sm font-semibold text-primary transition hover:text-primary/80">
               Edit Posts
             </button>
           </div>
@@ -1708,15 +1743,15 @@ function Composer({
           </div>
         </div>
 
-        <div className="mt-9 rounded-[18px] bg-white p-4 shadow-[0_2px_8px_rgba(26,24,35,0.12)]">
+        <div className="mt-9 rounded-[18px] bg-card p-4 shadow-[0_2px_8px_rgba(26,24,35,0.12)]">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2 text-base font-black text-[#3b4559]">
-              <Sparkles className="h-5 w-5 text-[#9258ff]" /> AI Features
+            <div className="flex items-center gap-2 text-base font-black text-foreground">
+              <Sparkles className="h-5 w-5 text-primary" /> AI Features
             </div>
-            <ChevronDown className="h-4 w-4 text-[#9258ff]" />
+            <ChevronDown className="h-4 w-4 text-primary" />
           </div>
-          <div className="mt-4 grid grid-cols-3 rounded-full bg-[#eef0f4] p-1 text-xs font-bold text-[#9aa0ad]">
-            <button className="rounded-full bg-white px-3 py-2 text-[#3b4559] shadow-sm">
+          <div className="mt-4 grid grid-cols-3 rounded-full bg-muted p-1 text-xs font-bold text-muted-foreground">
+            <button className="rounded-full bg-card px-3 py-2 text-foreground shadow-sm">
               Captions
             </button>
             <button className="px-3 py-2">Script</button>
@@ -1726,7 +1761,7 @@ function Composer({
 
         <button
           onClick={approve}
-          className="mt-auto inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#9258ee] py-3 text-sm font-bold text-white shadow-lg shadow-[#9258ee]/25 transition hover:bg-[#824be0]"
+          className="mt-auto inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-3 text-sm font-bold text-white shadow-lg shadow-primary/25 transition hover:brightness-110"
         >
           <Sparkles className="h-4 w-4" /> Approve & Schedule to Calendar
         </button>
@@ -1747,12 +1782,12 @@ function ToggleRow({
   onChange: (v: boolean) => void;
 }) {
   return (
-    <label className="flex cursor-pointer items-center justify-between rounded-[18px] bg-white px-5 py-3.5 shadow-[0_2px_6px_rgba(26,24,35,0.14)] transition hover:shadow-[0_4px_12px_rgba(26,24,35,0.18)]">
-      <span className="flex items-center gap-3 text-sm font-bold text-[#1f1f24]">
-        <Icon className="h-4 w-4 text-black" /> {label}
+    <label className="flex cursor-pointer items-center justify-between rounded-[18px] bg-card px-5 py-3.5 shadow-[0_2px_6px_rgba(26,24,35,0.14)] transition hover:shadow-[0_4px_12px_rgba(26,24,35,0.18)]">
+      <span className="flex items-center gap-3 text-sm font-bold text-foreground">
+        <Icon className="h-4 w-4 text-foreground" /> {label}
       </span>
       <span className="flex items-center gap-2">
-        <ChevronDown className="h-4 w-4 text-[#9258ff]" />
+        <ChevronDown className="h-4 w-4 text-primary" />
         <input
           type="checkbox"
           className="sr-only"
