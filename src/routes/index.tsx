@@ -54,6 +54,15 @@ import {
   TrendingDown,
   Moon,
   Sun,
+  Table,
+  Frame,
+  LayoutGrid,
+  Shirt,
+  Box,
+  Hexagon,
+  File,
+  Search,
+  X,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -68,7 +77,8 @@ export const Route = createFileRoute("/")({
   component: OmniForgeApp,
 });
 
-type View = "metrics" | "dashboard" | "ideas" | "composer" | "calendar" | "settings";
+type View =
+  "metrics" | "dashboard" | "ideas" | "composer" | "calendar" | "settings" | "assetLibrary";
 
 interface ComposerSeed {
   caption: string;
@@ -217,6 +227,188 @@ const AI_CLIPS = [
   },
 ];
 
+// ---------- COMPOSER: IDEA ENGINE DATA ----------
+const CAMPAIGN_GOALS = [
+  "Product Launch",
+  "Raise Awareness",
+  "Effective Advertisement",
+  "Marketing Campaign",
+  "Lead Generation",
+  "Brand Retention",
+];
+
+type GeneratedIdea = {
+  day: string;
+  platform: string;
+  icon: typeof Linkedin;
+  iconBg: string;
+  teaser: string;
+  caption: string;
+  thumb: string;
+};
+
+// Simulated AI output shown beneath the Generate button inside the Ideas card.
+const GENERATED_IDEAS: GeneratedIdea[] = [
+  {
+    day: "Day 1",
+    platform: "LinkedIn Text Post",
+    icon: Linkedin,
+    iconBg: "bg-[#0A66C2]",
+    teaser: "We rebuilt our scheduler from the ground up — here's the unfair advantage.",
+    caption:
+      "We rebuilt our scheduler from the ground up. Here's why business owners are calling it 'the unfair advantage' — a 3-minute read on the workflow change that saved our team 10 hours a week.",
+    thumb: "https://images.unsplash.com/photo-1518173946687-a4c8892bbd9f?w=300",
+  },
+  {
+    day: "Day 3",
+    platform: "Instagram Visual Reel",
+    icon: Instagram,
+    iconBg: "bg-gradient-to-tr from-[#F58529] via-[#DD2A7B] to-[#8134AF]",
+    teaser: "POV: Your social calendar fills itself. ✨",
+    caption:
+      "POV: Your social calendar fills itself. ✨ Tap to see the new AI scheduler in action.",
+    thumb: "https://images.unsplash.com/photo-1500534314209-a25ddb2bd429?w=300",
+  },
+  {
+    day: "Day 5",
+    platform: "X / Twitter Thread",
+    icon: Twitter,
+    iconBg: "bg-black",
+    teaser: "We shipped AI scheduling this week. 9 things we learned (a thread 🧵)",
+    caption: "We shipped AI scheduling this week. 9 things we learned building it (a thread 🧵)",
+    thumb: "https://images.unsplash.com/photo-1505533321630-975218a5f66f?w=300",
+  },
+  {
+    day: "Day 7",
+    platform: "Facebook Carousel",
+    icon: Facebook,
+    iconBg: "bg-[#1877F2]",
+    teaser: "5 ways small teams reclaim 10 hours a week with automation.",
+    caption:
+      "5 ways small teams reclaim 10 hours a week. Swipe through the workflow our customers can't stop talking about →",
+    thumb: "https://images.unsplash.com/photo-1473773508845-188df298d2d1?w=300",
+  },
+];
+
+// ---------- COMPOSER: ASSET LIBRARY DATA ----------
+// Horizontally-scrollable filter pills. "All" always shows everything.
+const ASSET_TILE_FILTERS = ["All", "Top", "Recent", "Images", "Videos", "Logos", "Templates"];
+
+type AssetTile = {
+  label: string;
+  icon: typeof ImageIcon;
+  bg: string;
+  cats: string[]; // which filters (besides "All") this tile belongs to
+};
+
+const ASSET_TILES: AssetTile[] = [
+  { label: "Shapes", icon: ImageIcon, bg: "from-[#22d3ee] to-[#0ea5e9]", cats: ["Images"] },
+  { label: "Graphics", icon: Sparkles, bg: "from-[#ff8a00] to-[#ff2d55]", cats: ["Images", "Top"] },
+  {
+    label: "Animations",
+    icon: Play,
+    bg: "from-[#a3e635] to-[#16a34a]",
+    cats: ["Videos", "Recent"],
+  },
+  { label: "Photos", icon: ImageIcon, bg: "from-[#38bdf8] to-[#2563eb]", cats: ["Images", "Top"] },
+  { label: "Videos", icon: Video, bg: "from-[#fb5cff] to-[#c026d3]", cats: ["Videos", "Top"] },
+  { label: "Audio", icon: Music2, bg: "from-[#ff496f] to-[#e11d48]", cats: ["Recent"] },
+  { label: "Charts", icon: TrendingUp, bg: "from-[#67e8f9] to-[#a855f7]", cats: ["Templates"] },
+  { label: "Forms", icon: CheckCircle2, bg: "from-[#4ade80] to-[#16a34a]", cats: ["Templates"] },
+  { label: "Sheets", icon: FileText, bg: "from-[#60a5fa] to-[#2563eb]", cats: ["Templates"] },
+  {
+    label: "Tables",
+    icon: Table,
+    bg: "from-[#f97316] to-[#ea580c]",
+    cats: ["Templates", "Recent"],
+  },
+  { label: "Frames", icon: Frame, bg: "from-[#34d399] to-[#059669]", cats: ["Images"] },
+  { label: "Grids", icon: LayoutGrid, bg: "from-[#c084fc] to-[#7c3aed]", cats: ["Templates"] },
+  { label: "Mockups", icon: Shirt, bg: "from-[#38bdf8] to-[#2563eb]", cats: ["Images", "Recent"] },
+  { label: "3D", icon: Box, bg: "from-[#f472b6] to-[#db2777]", cats: ["Images"] },
+  { label: "Logo", icon: Hexagon, bg: "from-[#a78bfa] to-[#6d28d9]", cats: ["Logos", "Top"] },
+  { label: "PDFs", icon: File, bg: "from-[#f87171] to-[#dc2626]", cats: [] },
+];
+
+// ---------- FULL ASSET LIBRARY PAGE DATA ----------
+type LibraryAsset = {
+  name: string;
+  type: "Image" | "Logo" | "Video" | "PDF";
+  date: string;
+  grade: "A" | "B" | "C";
+  status: "recent" | "top" | "unused";
+  emoji: string;
+};
+
+const LIBRARY_ASSETS: LibraryAsset[] = [
+  {
+    name: "Summer Banner",
+    type: "Image",
+    date: "Jun 1",
+    grade: "A",
+    status: "recent",
+    emoji: "🖼️",
+  },
+  { name: "Product Hero", type: "Image", date: "May 12", grade: "B", status: "top", emoji: "⛰️" },
+  {
+    name: "Brand Logo (Light)",
+    type: "Logo",
+    date: "Jan 3",
+    grade: "C",
+    status: "top",
+    emoji: "🔵",
+  },
+  {
+    name: "Brand Logo (Dark)",
+    type: "Logo",
+    date: "Jan 3",
+    grade: "B",
+    status: "recent",
+    emoji: "⚫",
+  },
+  { name: "Intro Reel", type: "Video", date: "Jun 8", grade: "B", status: "unused", emoji: "🎬" },
+  {
+    name: "Holiday Graphic",
+    type: "Image",
+    date: "Nov 20",
+    grade: "A",
+    status: "unused",
+    emoji: "🎄",
+  },
+  {
+    name: "Brand Guidelines",
+    type: "PDF",
+    date: "Feb 14",
+    grade: "A",
+    status: "recent",
+    emoji: "📄",
+  },
+  { name: "Customer Story", type: "Image", date: "May 28", grade: "A", status: "top", emoji: "🧑" },
+  {
+    name: "App Screenshot",
+    type: "Image",
+    date: "Jun 10",
+    grade: "B",
+    status: "unused",
+    emoji: "📱",
+  },
+  { name: "Sale Badge", type: "Image", date: "Jun 2", grade: "A", status: "recent", emoji: "🏷️" },
+  { name: "Promo Video", type: "Video", date: "May 30", grade: "A", status: "top", emoji: "📹" },
+  { name: "Terms PDF", type: "PDF", date: "Mar 1", grade: "C", status: "unused", emoji: "📋" },
+];
+
+const LIBRARY_TYPE_FILTERS = ["All", "Images", "Videos", "Logos", "PDFs"];
+const LIBRARY_NAV = {
+  library: [
+    { label: "All Assets", count: 34 },
+    { label: "Brand Kit", count: null as number | null },
+    { label: "Snippets", count: 12 },
+    { label: "Hashtag Library", count: 8 },
+  ],
+  collections: ["Summer Campaign", "Product Launch", "Holiday Series"],
+  app: ["Composer", "Calendar", "Analytics"],
+};
+
 // ---------- ROOT ----------
 type Theme = "light" | "dark";
 
@@ -259,6 +451,7 @@ function OmniForgeApp() {
             <Composer
               seed={composerSeed}
               onExplore={() => setView("ideas")}
+              onEditLibrary={() => setView("assetLibrary")}
               onSchedule={(item) => {
                 setCalendar((c) => ({ ...c, Thu: [...c.Thu, item] }));
               }}
@@ -266,6 +459,7 @@ function OmniForgeApp() {
           )}
           {view === "calendar" && <CalendarView calendar={calendar} />}
           {view === "settings" && <SettingsView />}
+          {view === "assetLibrary" && <FullAssetLibrary onBack={() => setView("composer")} />}
         </div>
       </main>
     </div>
@@ -1465,10 +1659,12 @@ function IdeaEngine({ navigate }: { navigate: (v: View, seed?: ComposerSeed) => 
 function Composer({
   seed,
   onExplore,
+  onEditLibrary,
   onSchedule,
 }: {
   seed: ComposerSeed | null;
   onExplore: () => void;
+  onEditLibrary: () => void;
   onSchedule: (item: {
     caption: string;
     thumb: string;
@@ -1488,6 +1684,36 @@ function Composer({
     linkedin: true,
   });
   const [uploadedVideo, setUploadedVideo] = useState<string | null>(null);
+
+  // Ideas card (collapsible AI Idea Engine)
+  const [ideasOpen, setIdeasOpen] = useState(false);
+  const [campaignGoal, setCampaignGoal] = useState(CAMPAIGN_GOALS[0]);
+  const [brief, setBrief] = useState("");
+  const [generating, setGenerating] = useState(false);
+  const [ideas, setIdeas] = useState<GeneratedIdea[] | null>(null);
+  const [pendingIdea, setPendingIdea] = useState<GeneratedIdea | null>(null);
+
+  // Asset Library filter
+  const [assetFilter, setAssetFilter] = useState("All");
+  const visibleTiles =
+    assetFilter === "All" ? ASSET_TILES : ASSET_TILES.filter((t) => t.cats.includes(assetFilter));
+
+  const generateIdeas = () => {
+    setIdeasOpen(true);
+    setGenerating(true);
+    setIdeas(null);
+    setTimeout(() => {
+      setGenerating(false);
+      setIdeas(GENERATED_IDEAS);
+      toast.success(`Generated ${GENERATED_IDEAS.length} ideas for ${campaignGoal}`);
+    }, 1400);
+  };
+
+  const applyIdea = (idea: GeneratedIdea) => {
+    setCaption(idea.caption);
+    setPendingIdea(null);
+    toast.success(`${idea.day} caption added to your post`);
+  };
   const composerShellRef = useRef<HTMLDivElement>(null);
   const [composerColumns, setComposerColumns] = useState({ left: 26, right: 26 });
   const centerColumn = 100 - composerColumns.left - composerColumns.right;
@@ -1552,7 +1778,7 @@ function Composer({
   return (
     <div
       ref={composerShellRef}
-      className="grid min-h-screen grid-cols-1 bg-background text-foreground lg:h-screen lg:[grid-template-columns:minmax(220px,var(--composer-left))_4px_minmax(360px,var(--composer-center))_4px_minmax(260px,var(--composer-right))]"
+      className="grid min-h-screen grid-cols-1 bg-background text-foreground lg:min-h-0 lg:h-[calc(100vh-4rem)] lg:[grid-template-columns:minmax(220px,var(--composer-left))_4px_minmax(360px,var(--composer-center))_4px_minmax(260px,var(--composer-right))]"
       style={
         {
           "--composer-left": `${composerColumns.left}%`,
@@ -1562,7 +1788,7 @@ function Composer({
       }
     >
       {/* LEFT */}
-      <div className="relative flex h-auto flex-col overflow-y-auto bg-card p-7 lg:h-screen">
+      <div className="relative flex h-auto flex-col overflow-y-auto bg-card p-7 lg:h-full">
         <div className="flex items-center justify-between">
           <h3 className="text-base font-bold tracking-tight text-foreground">AI Idea Engine</h3>
           <button
@@ -1573,14 +1799,100 @@ function Composer({
           </button>
         </div>
 
-        <section className="mt-5 rounded-[20px] bg-card p-7 shadow-[0_2px_8px_rgba(26,24,35,0.16)]">
-          <div className="flex items-center justify-between">
+        <section className="mt-5 rounded-[20px] bg-card p-6 shadow-[0_2px_8px_rgba(26,24,35,0.16)]">
+          <button
+            type="button"
+            onClick={() => setIdeasOpen((o) => !o)}
+            aria-expanded={ideasOpen}
+            className="flex w-full items-center justify-between"
+          >
             <h4 className="text-base font-bold text-foreground">Ideas</h4>
-            <ChevronDown className="h-4 w-4 text-primary" />
-          </div>
-          <button className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-5 py-3 text-sm font-bold text-white shadow-sm transition hover:brightness-110">
-            <Sparkles className="h-4 w-4" /> Generate
+            <ChevronDown
+              className={`h-4 w-4 text-primary transition-transform ${ideasOpen ? "rotate-180" : ""}`}
+            />
           </button>
+
+          {ideasOpen && (
+            <div className="mt-5 space-y-4">
+              <div>
+                <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  Campaign Goal
+                </label>
+                <select
+                  value={campaignGoal}
+                  onChange={(e) => setCampaignGoal(e.target.value)}
+                  className="mt-2 w-full rounded-xl border border-border bg-secondary/40 px-3 py-2.5 text-sm font-semibold text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/30"
+                >
+                  {CAMPAIGN_GOALS.map((g) => (
+                    <option key={g} value={g}>
+                      {g}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  Brief
+                </label>
+                <textarea
+                  value={brief}
+                  onChange={(e) => setBrief(e.target.value)}
+                  placeholder="Describe your idea or just push generate ..."
+                  className="mt-2 min-h-[110px] w-full resize-none rounded-xl border border-border bg-secondary/40 p-3 text-sm text-foreground outline-none placeholder:text-muted-foreground/70 focus:border-primary focus:ring-2 focus:ring-primary/30"
+                />
+              </div>
+            </div>
+          )}
+
+          <button
+            onClick={generateIdeas}
+            disabled={generating}
+            className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-5 py-3 text-sm font-bold text-white shadow-sm transition hover:brightness-110 disabled:opacity-70"
+          >
+            {generating ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" /> Generating…
+              </>
+            ) : (
+              <>
+                <Sparkles className="h-4 w-4" /> Generate
+              </>
+            )}
+          </button>
+
+          {ideasOpen && ideas && (
+            <div className="mt-5 space-y-2 border-t border-border pt-4">
+              <div className="text-[11px] font-semibold uppercase tracking-widest text-primary">
+                Generated Ideas
+              </div>
+              {ideas.map((idea) => (
+                <button
+                  key={idea.day}
+                  onClick={() => setPendingIdea(idea)}
+                  className="group flex w-full items-center gap-3 rounded-xl border border-border bg-card p-2.5 text-left transition hover:border-primary hover:bg-muted"
+                >
+                  <img
+                    src={idea.thumb}
+                    alt=""
+                    className="h-11 w-11 shrink-0 rounded-lg object-cover"
+                  />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-1.5">
+                      <span
+                        className={`grid h-4 w-4 shrink-0 place-items-center rounded ${idea.iconBg}`}
+                      >
+                        <idea.icon className="h-2.5 w-2.5 text-white" />
+                      </span>
+                      <span className="truncate text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                        {idea.day} · {idea.platform}
+                      </span>
+                    </div>
+                    <p className="mt-1 line-clamp-2 text-xs text-foreground/90">{idea.teaser}</p>
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
         </section>
 
         <h3 className="mt-8 text-base font-bold tracking-tight text-foreground">Source</h3>
@@ -1595,46 +1907,59 @@ function Composer({
 
         <div className="mt-8 flex items-center justify-between">
           <h3 className="text-base font-bold tracking-tight text-foreground">Asset Library</h3>
-          <button className="text-sm font-semibold text-primary transition hover:text-primary/80">
+          <button
+            onClick={onEditLibrary}
+            className="text-sm font-semibold text-primary transition hover:text-primary/80"
+          >
             Edit Library
           </button>
         </div>
-        <div className="mt-4 flex gap-2">
-          {["All", "Top", "Recent"].map((filter, index) => (
-            <button
-              key={filter}
-              className={`h-6 flex-1 rounded-full text-xs font-bold text-white ${index === 0 ? "bg-[#22c55e]" : index === 1 ? "bg-[#1ea7e1]" : "bg-[#d92b72]"}`}
-            >
-              {filter}
-            </button>
-          ))}
+
+        {/* Horizontally-scrollable filter pills — shrink-0 keeps them from being
+            collapsed by the sidebar's flex column (overflow-x sets min-height:0). */}
+        <div className="mt-4 flex shrink-0 gap-2 overflow-x-auto whitespace-nowrap pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          {ASSET_TILE_FILTERS.map((filter) => {
+            const active = assetFilter === filter;
+            return (
+              <button
+                key={filter}
+                onClick={() => setAssetFilter(filter)}
+                className={`h-7 shrink-0 rounded-full px-3.5 text-xs font-bold transition ${
+                  active
+                    ? "bg-primary text-white shadow-sm shadow-primary/30"
+                    : "bg-secondary text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {filter}
+              </button>
+            );
+          })}
         </div>
 
-        <div className="mt-7 grid grid-cols-3 gap-x-6 gap-y-7">
-          {[
-            { label: "Shapes", icon: ImageIcon, bg: "from-[#22d3ee] to-[#0ea5e9]" },
-            { label: "Graphics", icon: Sparkles, bg: "from-[#ff8a00] to-[#ff2d55]" },
-            { label: "Animations", icon: Play, bg: "from-[#a3e635] to-[#16a34a]" },
-            { label: "Photos", icon: ImageIcon, bg: "from-[#38bdf8] to-[#2563eb]" },
-            { label: "Videos", icon: Video, bg: "from-[#fb5cff] to-[#c026d3]" },
-            { label: "Audio", icon: Music2, bg: "from-[#ff496f] to-[#e11d48]" },
-            { label: "Charts", icon: TrendingUp, bg: "from-[#67e8f9] to-[#a855f7]" },
-            { label: "Forms", icon: CheckCircle2, bg: "from-[#4ade80] to-[#16a34a]" },
-            { label: "Sheets", icon: FileText, bg: "from-[#60a5fa] to-[#2563eb]" },
-          ].map((asset) => (
+        {/* Tiles flow directly in the sidebar — the whole left bar is the single
+            scroll container, so rows cut off at the bottom cue scrolling the bar.
+            shrink-0 keeps rows at full height instead of being squished by the flex column. */}
+        <div className="mt-5 grid shrink-0 grid-cols-3 gap-x-5 gap-y-6">
+          {visibleTiles.map((asset) => (
             <button
               key={asset.label}
+              onClick={() => toast(`${asset.label} assets`)}
               className="group flex min-w-0 flex-col items-center gap-2 text-center"
             >
               <span
-                className={`grid h-[58px] w-[58px] place-items-center rounded-xl bg-gradient-to-br ${asset.bg} text-white shadow-[3px_4px_0_rgba(255,255,255,0.75)_inset,0_5px_12px_rgba(18,20,30,0.2)] transition group-hover:-translate-y-0.5`}
+                className={`grid h-[54px] w-[54px] place-items-center rounded-xl bg-gradient-to-br ${asset.bg} text-white shadow-[3px_4px_0_rgba(255,255,255,0.75)_inset,0_5px_12px_rgba(18,20,30,0.2)] transition group-hover:-translate-y-0.5`}
               >
-                <asset.icon className="h-7 w-7" />
+                <asset.icon className="h-6 w-6" />
               </span>
               <span className="text-xs text-foreground">{asset.label}</span>
             </button>
           ))}
         </div>
+        {visibleTiles.length === 0 && (
+          <p className="py-6 text-center text-xs text-muted-foreground">
+            No assets in this filter.
+          </p>
+        )}
       </div>
 
       <ComposerResizeHandle
@@ -1644,7 +1969,7 @@ function Composer({
       />
 
       {/* CENTER */}
-      <div className="flex min-h-screen flex-col overflow-y-auto bg-muted px-6 py-6 lg:h-screen">
+      <div className="flex min-h-screen flex-col overflow-y-auto bg-muted px-6 py-6 lg:min-h-0 lg:h-full">
         <div className="mx-auto flex w-full max-w-md items-center rounded-xl border border-border bg-card/80 p-1 shadow-sm">
           {(
             [
@@ -1754,7 +2079,7 @@ function Composer({
       />
 
       {/* RIGHT */}
-      <div className="relative flex h-auto flex-col overflow-y-auto bg-card p-7 lg:h-screen">
+      <div className="relative flex h-auto flex-col overflow-y-auto bg-card p-7 lg:h-full">
         <h3 className="text-base font-bold tracking-tight text-foreground">Publish Settings</h3>
         <label className="mt-5 block text-base font-bold text-foreground">Caption</label>
         <textarea
@@ -1827,6 +2152,53 @@ function Composer({
           <Sparkles className="h-4 w-4" /> Approve & Schedule to Calendar
         </button>
       </div>
+
+      {/* "Use this idea?" confirmation modal */}
+      {pendingIdea && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm"
+          onClick={() => setPendingIdea(null)}
+        >
+          <div
+            className="w-full max-w-sm rounded-2xl border border-border bg-card p-6 text-foreground shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start gap-3">
+              <img
+                src={pendingIdea.thumb}
+                alt=""
+                className="h-14 w-14 shrink-0 rounded-lg object-cover"
+              />
+              <div className="min-w-0">
+                <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  {pendingIdea.day} · {pendingIdea.platform}
+                </div>
+                <p className="mt-1 line-clamp-3 text-sm text-foreground/90">
+                  {pendingIdea.caption}
+                </p>
+              </div>
+            </div>
+            <h3 className="mt-5 text-lg font-bold">Do you want to use this idea?</h3>
+            <p className="mt-1 text-sm text-muted-foreground">
+              It will fill the Caption in your Publish Settings.
+            </p>
+            <div className="mt-5 flex gap-3">
+              <button
+                onClick={() => setPendingIdea(null)}
+                className="flex-1 rounded-xl border border-border bg-secondary py-2.5 text-sm font-semibold text-foreground transition hover:bg-muted"
+              >
+                No
+              </button>
+              <button
+                onClick={() => applyIdea(pendingIdea)}
+                className="flex-1 rounded-xl bg-primary py-2.5 text-sm font-semibold text-white transition hover:brightness-110"
+              >
+                Yes, use it
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -1882,6 +2254,294 @@ function ToggleRow({
         />
       </span>
     </label>
+  );
+}
+
+// ---------- FULL ASSET LIBRARY PAGE ----------
+const STATUS_META: Record<LibraryAsset["status"], { label: string; text: string; tint: string }> = {
+  recent: { label: "Used recently", text: "text-primary", tint: "bg-primary/10" },
+  top: {
+    label: "Top performing",
+    text: "text-emerald-600 dark:text-emerald-300",
+    tint: "bg-emerald-500/10",
+  },
+  unused: { label: "Unused", text: "text-muted-foreground", tint: "bg-muted" },
+};
+
+const GRADE_COLOR: Record<LibraryAsset["grade"], string> = {
+  A: "text-emerald-600 dark:text-emerald-300",
+  B: "text-amber-600 dark:text-amber-300",
+  C: "text-rose-600 dark:text-rose-300",
+};
+
+function FullAssetLibrary({ onBack }: { onBack: () => void }) {
+  const [typeFilter, setTypeFilter] = useState("All");
+  const [activeNav, setActiveNav] = useState("All Assets");
+  const [selected, setSelected] = useState<LibraryAsset | null>(null);
+  const [aiAssist, setAiAssist] = useState(true);
+  const [sort, setSort] = useState("Recently uploaded");
+
+  const typeOf: Record<string, LibraryAsset["type"]> = {
+    Images: "Image",
+    Videos: "Video",
+    Logos: "Logo",
+    PDFs: "PDF",
+  };
+  const filteredAssets =
+    typeFilter === "All"
+      ? LIBRARY_ASSETS
+      : LIBRARY_ASSETS.filter((a) => a.type === typeOf[typeFilter]);
+
+  return (
+    <div className="flex min-h-[calc(100vh-4rem)] w-full flex-col bg-background text-foreground lg:h-[calc(100vh-4rem)] lg:flex-row">
+      {/* LEFT — navigation tree */}
+      <aside className="flex w-full shrink-0 flex-col overflow-y-auto border-b border-border bg-card p-5 lg:w-64 lg:border-b-0 lg:border-r">
+        <div>
+          <h2 className="text-lg font-bold tracking-tight">Asset Library</h2>
+          <p className="text-xs text-muted-foreground">OmniForge</p>
+        </div>
+
+        <div className="mt-5 flex items-center gap-2 rounded-xl border border-border bg-secondary/50 px-3">
+          <Search className="h-4 w-4 text-muted-foreground" />
+          <input
+            placeholder="Search assets…"
+            className="w-full bg-transparent py-2.5 text-sm outline-none placeholder:text-muted-foreground/70"
+          />
+        </div>
+
+        <div className="mt-4 flex flex-wrap gap-2">
+          {LIBRARY_TYPE_FILTERS.map((f) => {
+            const active = typeFilter === f;
+            return (
+              <button
+                key={f}
+                onClick={() => setTypeFilter(f)}
+                className={`rounded-full px-3 py-1 text-xs font-semibold transition ${
+                  active
+                    ? "bg-primary/15 text-primary"
+                    : "bg-secondary text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {f}
+              </button>
+            );
+          })}
+        </div>
+
+        <NavGroup title="Library">
+          {LIBRARY_NAV.library.map((item) => (
+            <NavItem
+              key={item.label}
+              label={item.label}
+              count={item.count}
+              active={activeNav === item.label}
+              onClick={() => setActiveNav(item.label)}
+            />
+          ))}
+        </NavGroup>
+
+        <NavGroup title="Collections">
+          {LIBRARY_NAV.collections.map((label) => (
+            <NavItem
+              key={label}
+              label={label}
+              active={activeNav === label}
+              onClick={() => setActiveNav(label)}
+            />
+          ))}
+        </NavGroup>
+
+        <NavGroup title="App">
+          {LIBRARY_NAV.app.map((label) => (
+            <NavItem
+              key={label}
+              label={label}
+              muted
+              onClick={label === "Composer" ? onBack : () => toast(`${label} — coming soon`)}
+            />
+          ))}
+        </NavGroup>
+      </aside>
+
+      {/* CENTER — asset grid */}
+      <section className="flex min-w-0 flex-1 flex-col overflow-y-auto p-6">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight">{activeNav}</h1>
+            <p className="text-xs text-muted-foreground">{filteredAssets.length} assets</p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <select
+              value={sort}
+              onChange={(e) => setSort(e.target.value)}
+              className="rounded-xl border border-border bg-card px-3 py-2 text-sm outline-none focus:border-primary"
+            >
+              <option>Recently uploaded</option>
+              <option>Oldest first</option>
+              <option>Name (A–Z)</option>
+            </select>
+            <button
+              onClick={() => setAiAssist((v) => !v)}
+              className="flex items-center gap-2 rounded-xl border border-border bg-card px-3 py-2 text-xs font-semibold"
+            >
+              <span>AI assist {aiAssist ? "on" : "off"}</span>
+              <span
+                className={`relative h-4 w-7 rounded-full transition ${aiAssist ? "bg-primary" : "bg-muted"}`}
+              >
+                <span
+                  className={`absolute top-0.5 h-3 w-3 rounded-full bg-white transition-all ${aiAssist ? "left-3.5" : "left-0.5"}`}
+                />
+              </span>
+            </button>
+            <button
+              onClick={() => toast.success("Upload dialog opened")}
+              className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:brightness-110"
+            >
+              <Upload className="h-4 w-4" /> Upload
+            </button>
+          </div>
+        </div>
+
+        <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          {filteredAssets.map((asset) => {
+            const meta = STATUS_META[asset.status];
+            const isSel = selected?.name === asset.name;
+            return (
+              <button
+                key={asset.name}
+                onClick={() => setSelected(asset)}
+                className={`overflow-hidden rounded-2xl border text-left transition hover:-translate-y-0.5 hover:shadow-lg ${
+                  isSel ? "border-primary ring-2 ring-primary/30" : "border-border"
+                }`}
+              >
+                <div className={`relative grid h-28 place-items-center ${meta.tint}`}>
+                  <span className="text-4xl">{asset.emoji}</span>
+                  <span
+                    className={`absolute right-2 top-2 rounded-full bg-card/80 px-2 py-0.5 text-[10px] font-semibold ${meta.text}`}
+                  >
+                    {meta.label}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between gap-2 bg-card p-3">
+                  <div className="min-w-0">
+                    <div className="truncate text-sm font-semibold">{asset.name}</div>
+                    <div className="text-[11px] text-muted-foreground">
+                      {asset.type} · {asset.date}
+                    </div>
+                  </div>
+                  <span className={`text-sm font-bold ${GRADE_COLOR[asset.grade]}`}>
+                    {asset.grade}
+                  </span>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      </section>
+
+      {/* RIGHT — asset detail */}
+      <aside className="w-full shrink-0 overflow-y-auto border-t border-border bg-card p-5 lg:w-72 lg:border-l lg:border-t-0">
+        <div className="flex items-center justify-between">
+          <h3 className="text-base font-bold">Select an asset</h3>
+          {selected && (
+            <button
+              onClick={() => setSelected(null)}
+              aria-label="Clear selection"
+              className="text-muted-foreground transition hover:text-foreground"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          )}
+        </div>
+
+        {!selected ? (
+          <p className="mt-16 text-center text-sm text-muted-foreground">
+            Click any asset to see its details and AI report.
+          </p>
+        ) : (
+          <div className="mt-5">
+            <div
+              className={`grid h-32 place-items-center rounded-xl ${STATUS_META[selected.status].tint}`}
+            >
+              <span className="text-6xl">{selected.emoji}</span>
+            </div>
+            <h4 className="mt-4 text-lg font-bold">{selected.name}</h4>
+            <div className="mt-3 space-y-2 text-sm">
+              <DetailRow label="Type" value={selected.type} />
+              <DetailRow label="Uploaded" value={selected.date} />
+              <DetailRow label="Status" value={STATUS_META[selected.status].label} />
+              <DetailRow label="AI grade" value={selected.grade} />
+            </div>
+            <div className="mt-5 rounded-xl border border-border bg-secondary/40 p-3">
+              <div className="flex items-center gap-2 text-xs font-semibold text-primary">
+                <Sparkles className="h-3.5 w-3.5" /> AI Report
+              </div>
+              <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
+                {selected.status === "top"
+                  ? "This asset is outperforming your library average. Reuse it in upcoming campaigns for a projected engagement lift."
+                  : selected.status === "recent"
+                    ? "Recently used and performing steadily. Consider refreshing the caption to extend its shelf life."
+                    : "This asset hasn't been used yet. AI suggests pairing it with a Product Launch campaign to test performance."}
+              </p>
+            </div>
+          </div>
+        )}
+      </aside>
+    </div>
+  );
+}
+
+function NavGroup({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <div className="mt-6">
+      <div className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+        {title}
+      </div>
+      <div className="space-y-0.5">{children}</div>
+    </div>
+  );
+}
+
+function NavItem({
+  label,
+  count,
+  active,
+  muted,
+  onClick,
+}: {
+  label: string;
+  count?: number | null;
+  active?: boolean;
+  muted?: boolean;
+  onClick?: () => void;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm font-medium transition ${
+        active
+          ? "bg-primary/12 text-primary"
+          : muted
+            ? "text-muted-foreground hover:bg-secondary hover:text-foreground"
+            : "text-foreground hover:bg-secondary"
+      }`}
+    >
+      <span className="truncate">{label}</span>
+      {count != null && (
+        <span className="rounded-full bg-secondary px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground">
+          {count}
+        </span>
+      )}
+    </button>
+  );
+}
+
+function DetailRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-center justify-between border-b border-border pb-2">
+      <span className="text-muted-foreground">{label}</span>
+      <span className="font-semibold">{value}</span>
+    </div>
   );
 }
 
