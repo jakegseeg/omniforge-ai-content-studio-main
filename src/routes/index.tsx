@@ -35,7 +35,6 @@ import {
   ImageIcon,
   Video,
   FileText,
-  PanelRightClose,
   Plus,
   Heart,
   MessageCircle,
@@ -63,6 +62,14 @@ import {
   File,
   Search,
   X,
+  Check,
+  Ghost,
+  Layers,
+  MoreVertical,
+  MoreHorizontal,
+  ChevronRight,
+  ChevronLeft,
+  Maximize2,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -1655,6 +1662,276 @@ function IdeaEngine({ navigate }: { navigate: (v: View, seed?: ComposerSeed) => 
   );
 }
 
+// ---------- COMPOSER: CANVAS TOOLBARS ----------
+type IconType = React.ComponentType<{ className?: string }>;
+
+// Brand logos lucide doesn't ship (real simple-icons paths).
+const IconTikTok: IconType = ({ className }) => (
+  <svg viewBox="0 0 24 24" fill="currentColor" className={className} aria-hidden="true">
+    <path d="M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.08 1.4-.54 2.79-1.35 3.94-1.31 1.92-3.58 3.17-5.91 3.21-1.43.08-2.86-.31-4.08-1.03-2.02-1.19-3.44-3.37-3.65-5.71-.02-.5-.03-1-.01-1.49.18-1.9 1.12-3.72 2.58-4.96 1.66-1.44 3.98-2.13 6.15-1.72.02 1.48-.04 2.96-.04 4.44-.99-.32-2.15-.23-3.02.37-.63.41-1.11 1.04-1.36 1.75-.21.51-.15 1.07-.14 1.61.24 1.64 1.82 3.02 3.5 2.87 1.12-.01 2.19-.66 2.77-1.61.19-.33.4-.67.41-1.06.1-1.79.06-3.57.07-5.36.01-4.03-.01-8.05.02-12.07z" />
+  </svg>
+);
+const IconX: IconType = ({ className }) => (
+  <svg viewBox="0 0 24 24" fill="currentColor" className={className} aria-hidden="true">
+    <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+  </svg>
+);
+const IconPinterest: IconType = ({ className }) => (
+  <svg viewBox="0 0 24 24" fill="currentColor" className={className} aria-hidden="true">
+    <path d="M12.017 0C5.396 0 .029 5.367.029 11.987c0 5.079 3.158 9.417 7.618 11.162-.105-.949-.199-2.403.041-3.439.219-.937 1.406-5.957 1.406-5.957s-.359-.72-.359-1.781c0-1.663.967-2.911 2.168-2.911 1.024 0 1.518.769 1.518 1.688 0 1.029-.653 2.567-.992 3.992-.285 1.193.6 2.165 1.775 2.165 2.128 0 3.768-2.245 3.768-5.487 0-2.861-2.063-4.869-5.008-4.869-3.41 0-5.409 2.562-5.409 5.199 0 1.033.394 2.143.889 2.741.099.12.112.225.085.345-.09.375-.293 1.199-.334 1.363-.053.225-.172.271-.402.165-1.495-.69-2.433-2.878-2.433-4.646 0-3.776 2.748-7.252 7.92-7.252 4.158 0 7.392 2.967 7.392 6.923 0 4.135-2.607 7.462-6.233 7.462-1.214 0-2.357-.629-2.746-1.378l-.747 2.848c-.269 1.045-1.004 2.352-1.498 3.146 1.123.345 2.306.535 3.55.535 6.607 0 11.985-5.365 11.985-11.987C23.97 5.39 18.592.026 12.018.026L12.017 0z" />
+  </svg>
+);
+
+// Upper platform-selector toolbar (edit mode), left→right.
+const PLATFORMS: { label: string; Icon: IconType }[] = [
+  { label: "TikTok", Icon: IconTikTok },
+  { label: "Instagram", Icon: Instagram },
+  { label: "Facebook", Icon: Facebook },
+  { label: "YouTube", Icon: Youtube },
+  { label: "LinkedIn", Icon: Linkedin },
+  { label: "Snapchat", Icon: Ghost },
+  { label: "Pinterest", Icon: IconPinterest },
+  { label: "X (Twitter)", Icon: IconX },
+];
+
+// Lower editing toolbar, left→right.
+const LOWER_TOOLS: { label: string; Icon: IconType }[] = [
+  { label: "Audio", Icon: Music2 },
+  { label: "Text", Icon: Type },
+  { label: "Sound Effects", Icon: Mic },
+  { label: "Captions", Icon: Captions },
+  { label: "Overlay", Icon: Layers },
+  { label: "Frame", Icon: Frame },
+  { label: "Crop", Icon: Crop },
+  { label: "Tools", Icon: SlidersHorizontal },
+  { label: "Delete", Icon: Trash2 },
+  { label: "More", Icon: MoreHorizontal },
+];
+
+// Blue selection handle positions (4 corners + 4 edge midpoints).
+const SELECTION_HANDLES = [
+  "left-0 top-0 -translate-x-1/2 -translate-y-1/2",
+  "left-1/2 top-0 -translate-x-1/2 -translate-y-1/2",
+  "right-0 top-0 translate-x-1/2 -translate-y-1/2",
+  "left-0 top-1/2 -translate-x-1/2 -translate-y-1/2",
+  "right-0 top-1/2 translate-x-1/2 -translate-y-1/2",
+  "left-0 bottom-0 -translate-x-1/2 translate-y-1/2",
+  "left-1/2 bottom-0 -translate-x-1/2 translate-y-1/2",
+  "right-0 bottom-0 translate-x-1/2 translate-y-1/2",
+];
+
+// Toolbar icon button with a hover tooltip badge above it.
+function ToolbarButton({
+  label,
+  Icon,
+  onClick,
+}: {
+  label: string;
+  Icon: IconType;
+  onClick?: () => void;
+}) {
+  return (
+    <div className="group/tt relative shrink-0">
+      <button
+        type="button"
+        onClick={onClick}
+        aria-label={label}
+        className="grid h-9 w-9 place-items-center rounded-lg text-foreground/80 transition hover:bg-primary/10 hover:text-foreground"
+      >
+        <Icon className="h-[18px] w-[18px]" />
+      </button>
+      <span className="pointer-events-none absolute -top-9 left-1/2 z-20 -translate-x-1/2 whitespace-nowrap rounded-md bg-foreground px-2 py-1 text-[11px] font-semibold text-background opacity-0 shadow-md transition group-hover/tt:opacity-100">
+        {label}
+      </span>
+    </div>
+  );
+}
+
+// ---------- COMPOSER: DESIGN BOARD ----------
+const FRAME_W = 300;
+const FRAME_H = 533; // 9:16 (default frame: Instagram Reel 1080×1920)
+// Board renders real px sizes scaled down: a 1080px-wide frame shows at 300px.
+const DISPLAY_SCALE = 300 / 1080;
+
+// Per-platform content sizes, curated from social-media-size-guide-2026.md
+// (only the 8 platforms shown in the frame toolbar). Others in the guide aren't
+// selectable here, so they're intentionally omitted.
+type SizeOption = { content: string; oneWord: string; aspect: string; w: number; h: number };
+const PLATFORM_SIZES: Record<string, SizeOption[]> = {
+  TikTok: [
+    { content: "Standard video", oneWord: "Video", aspect: "9:16", w: 1080, h: 1920 },
+    { content: "Photo Mode", oneWord: "Photo", aspect: "9:16", w: 1080, h: 1920 },
+    { content: "Carousel", oneWord: "Carousel", aspect: "9:16", w: 1080, h: 1920 },
+    { content: "Story", oneWord: "Story", aspect: "9:16", w: 1080, h: 1920 },
+    { content: "Video cover", oneWord: "Cover", aspect: "9:16", w: 1080, h: 1920 },
+    { content: "Cover (landscape)", oneWord: "Cover", aspect: "16:9", w: 1920, h: 1080 },
+    { content: "Profile picture", oneWord: "Profile", aspect: "1:1", w: 400, h: 400 },
+    { content: "Shop / product", oneWord: "Product", aspect: "1:1", w: 800, h: 800 },
+    { content: "In-Feed Ad", oneWord: "Ad", aspect: "9:16", w: 1080, h: 1920 },
+    { content: "TopView Ad", oneWord: "Ad", aspect: "9:16", w: 1080, h: 1920 },
+  ],
+  Instagram: [
+    { content: "Feed post – portrait", oneWord: "Post", aspect: "3:4", w: 1080, h: 1440 },
+    { content: "Feed post – portrait", oneWord: "Post", aspect: "4:5", w: 1080, h: 1350 },
+    { content: "Feed post – square", oneWord: "Post", aspect: "1:1", w: 1080, h: 1080 },
+    { content: "Feed post – landscape", oneWord: "Post", aspect: "1.91:1", w: 1080, h: 566 },
+    { content: "Carousel", oneWord: "Carousel", aspect: "4:5", w: 1080, h: 1350 },
+    { content: "Reel", oneWord: "Reel", aspect: "9:16", w: 1080, h: 1920 },
+    { content: "Story", oneWord: "Story", aspect: "9:16", w: 1080, h: 1920 },
+    { content: "Profile picture", oneWord: "Profile", aspect: "1:1", w: 320, h: 320 },
+    { content: "Feed ad – portrait", oneWord: "Ad", aspect: "4:5", w: 1440, h: 1800 },
+    { content: "Feed ad – square", oneWord: "Ad", aspect: "1:1", w: 1440, h: 1440 },
+    { content: "Story/Reel ad", oneWord: "Ad", aspect: "9:16", w: 1440, h: 2560 },
+  ],
+  Facebook: [
+    { content: "Feed post", oneWord: "Post", aspect: "4:5", w: 1080, h: 1350 },
+    { content: "Feed post – square", oneWord: "Post", aspect: "1:1", w: 1080, h: 1080 },
+    { content: "Link preview", oneWord: "Link", aspect: "1.91:1", w: 1200, h: 630 },
+    { content: "Cover photo", oneWord: "Cover", aspect: "2.28:1", w: 1640, h: 924 },
+    { content: "Story", oneWord: "Story", aspect: "9:16", w: 1080, h: 1920 },
+    { content: "Profile picture", oneWord: "Profile", aspect: "1:1", w: 2048, h: 2048 },
+    { content: "Event cover", oneWord: "Event", aspect: "2:1", w: 1920, h: 1005 },
+    { content: "Ad – image", oneWord: "Ad", aspect: "1:1", w: 800, h: 800 },
+    { content: "Ad – standalone", oneWord: "Ad", aspect: "1.91:1", w: 1200, h: 628 },
+    { content: "App ad", oneWord: "Ad", aspect: "1.91:1", w: 1200, h: 628 },
+  ],
+  YouTube: [
+    { content: "Long-form video", oneWord: "Video", aspect: "16:9", w: 1920, h: 1080 },
+    { content: "Shorts", oneWord: "Shorts", aspect: "9:16", w: 1080, h: 1920 },
+    { content: "Thumbnail", oneWord: "Thumbnail", aspect: "16:9", w: 1280, h: 720 },
+    { content: "Channel banner", oneWord: "Banner", aspect: "16:9", w: 2560, h: 1440 },
+    { content: "Intro / End screen", oneWord: "Intro", aspect: "16:9", w: 1920, h: 1080 },
+    { content: "Podcast cover", oneWord: "Cover", aspect: "1:1", w: 1280, h: 1280 },
+    { content: "Watermark", oneWord: "Icon", aspect: "1:1", w: 150, h: 150 },
+  ],
+  LinkedIn: [
+    { content: "Post – portrait", oneWord: "Post", aspect: "4:5", w: 1080, h: 1350 },
+    { content: "Post – square", oneWord: "Post", aspect: "1:1", w: 1080, h: 1080 },
+    { content: "Post – link", oneWord: "Link", aspect: "1.91:1", w: 1200, h: 627 },
+    { content: "Carousel – square", oneWord: "Carousel", aspect: "1:1", w: 1080, h: 1080 },
+    { content: "Carousel – portrait", oneWord: "Carousel", aspect: "4:5", w: 1080, h: 1350 },
+    { content: "Video – landscape", oneWord: "Video", aspect: "16:9", w: 1920, h: 1080 },
+    { content: "Video – vertical", oneWord: "Video", aspect: "9:16", w: 1080, h: 1920 },
+    { content: "Profile picture", oneWord: "Profile", aspect: "1:1", w: 400, h: 400 },
+    { content: "Cover banner", oneWord: "Banner", aspect: "4:1", w: 1584, h: 396 },
+    { content: "Company logo", oneWord: "Logo", aspect: "1:1", w: 400, h: 400 },
+  ],
+  Snapchat: [
+    { content: "Snap / Story", oneWord: "Story", aspect: "9:16", w: 1080, h: 1920 },
+    { content: "Snap Ad", oneWord: "Ad", aspect: "9:16", w: 1080, h: 1920 },
+    { content: "Profile picture", oneWord: "Profile", aspect: "1:1", w: 320, h: 320 },
+  ],
+  Pinterest: [
+    { content: "Standard Pin", oneWord: "Pin", aspect: "2:3", w: 1000, h: 1500 },
+    { content: "Square Pin", oneWord: "Pin", aspect: "1:1", w: 1000, h: 1000 },
+    { content: "Long Pin", oneWord: "Pin", aspect: "1:2.1", w: 1000, h: 2100 },
+    { content: "Idea Pin", oneWord: "Story", aspect: "9:16", w: 1080, h: 1920 },
+    { content: "Profile picture", oneWord: "Profile", aspect: "1:1", w: 400, h: 400 },
+    { content: "Board cover", oneWord: "Cover", aspect: "1:1", w: 600, h: 600 },
+    { content: "Standard ad", oneWord: "Ad", aspect: "2:3", w: 1000, h: 1500 },
+    { content: "Collection ad", oneWord: "Ad", aspect: "1:1", w: 1000, h: 1000 },
+  ],
+  "X (Twitter)": [
+    { content: "Post – landscape", oneWord: "Post", aspect: "16:9", w: 1200, h: 675 },
+    { content: "Video image", oneWord: "Video", aspect: "16:9", w: 1600, h: 900 },
+    { content: "Post – vertical", oneWord: "Post", aspect: "4:5", w: 1080, h: 1350 },
+    { content: "Profile picture", oneWord: "Profile", aspect: "1:1", w: 400, h: 400 },
+    { content: "Header / banner", oneWord: "Header", aspect: "3:1", w: 1500, h: 500 },
+    { content: "Image ad", oneWord: "Ad", aspect: "1.91:1", w: 800, h: 418 },
+    { content: "Carousel ad", oneWord: "Ad", aspect: "1.91:1", w: 800, h: 418 },
+  ],
+};
+
+type BoardFrameData = {
+  id: string;
+  x: number;
+  y: number;
+  platform: { label: string; Icon: IconType };
+  aspect: string;
+  contentLabel: string;
+  w: number; // real px width
+  h: number; // real px height
+  headline: string;
+};
+
+// A single post frame placed on the infinite board (world coordinates).
+function BoardFrame({
+  frame,
+  image,
+  selected,
+  placing,
+  onSelect,
+  onHeadline,
+  onDragStart,
+}: {
+  frame: BoardFrameData;
+  image: string;
+  selected: boolean;
+  placing: boolean;
+  onSelect: () => void;
+  onHeadline: (h: string) => void;
+  onDragStart: (e: React.PointerEvent) => void;
+}) {
+  const dispW = frame.w * DISPLAY_SCALE;
+  const dispH = frame.h * DISPLAY_SCALE;
+  return (
+    <div
+      className="pointer-events-auto absolute cursor-move"
+      style={{ left: frame.x, top: frame.y, width: dispW }}
+      onPointerDown={(e) => {
+        if (!placing) {
+          e.stopPropagation();
+          onSelect();
+          onDragStart(e);
+        }
+      }}
+    >
+      {/* Title — left-aligned to the frame; purple in edit mode, black otherwise */}
+      <div
+        className={`mb-1.5 truncate text-[13px] font-bold ${
+          selected ? "text-primary" : "text-foreground"
+        }`}
+      >
+        {frame.platform.label} · {frame.aspect} {frame.contentLabel}
+      </div>
+
+      <div
+        className={`relative rounded-[18px] ${
+          selected ? "ring-2 ring-blue-500 ring-offset-2 ring-offset-muted" : ""
+        }`}
+        style={{ width: dispW, height: dispH }}
+      >
+        <div className="absolute inset-0 overflow-hidden rounded-[16px] shadow-[0_14px_30px_rgba(0,0,0,0.2)]">
+          <img src={image} alt="" className="absolute inset-0 h-full w-full object-cover" />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-white/10" />
+          <div className="absolute inset-x-4 bottom-[8%]">
+            <textarea
+              value={frame.headline}
+              onChange={(e) => onHeadline(e.target.value)}
+              onPointerDown={(e) => e.stopPropagation()}
+              rows={2}
+              className="w-full resize-none rounded-xl border border-white/30 bg-black/35 p-2.5 text-center text-xl font-black leading-tight text-white outline-none backdrop-blur-md focus:border-primary"
+            />
+          </div>
+        </div>
+        {selected &&
+          SELECTION_HANDLES.map((pos) => (
+            <span
+              key={pos}
+              className={`absolute ${pos} h-3 w-3 rounded-[3px] border-2 border-blue-500 bg-white shadow-sm`}
+            />
+          ))}
+      </div>
+
+      {selected && (
+        <div className="mt-2 inline-block rounded-md bg-blue-500 px-2.5 py-0.5 text-xs font-bold text-white">
+          {frame.w} × {frame.h}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ---------- COMPOSER ----------
 function Composer({
   seed,
@@ -1674,9 +1951,150 @@ function Composer({
   const [selectedAsset, setSelectedAsset] = useState<string>(
     seed?.thumbnail || ASSET_GROUPS[0].items[0].url,
   );
-  const [overlayText, setOverlayText] = useState(seed?.title || "Your headline goes here");
   const [caption, setCaption] = useState(seed?.caption || "Write your cross-posting caption…");
   const [tab, setTab] = useState<"canvas" | "clips">("canvas");
+
+  // ----- Design board (Figma/CapCut-style center canvas) -----
+  const [frames, setFrames] = useState<BoardFrameData[]>(() => [
+    {
+      id: "f1",
+      x: 0,
+      y: 0,
+      platform: PLATFORMS[1], // Instagram
+      aspect: "9:16",
+      contentLabel: "Reel",
+      w: 1080,
+      h: 1920,
+      headline: seed?.title || "Your headline goes here",
+    },
+  ]);
+  // The selected frame is in edit mode; null = nothing selected.
+  const [selectedFrameId, setSelectedFrameId] = useState<string | null>("f1");
+  const [view, setView] = useState({ zoom: 1, x: 0, y: 0 });
+  const [placing, setPlacing] = useState(false);
+  const [ghost, setGhost] = useState<{ x: number; y: number } | null>(null);
+  // Which platform's size dropdown is open in the frame's top bar (null = closed).
+  const [openPlatform, setOpenPlatform] = useState<string | null>(null);
+  // Lower toolbar dock: hidden (slid to the right edge) or centered.
+  const [dockHidden, setDockHidden] = useState(false);
+  const boardRef = useRef<HTMLDivElement>(null);
+  const panRef = useRef<{ startX: number; startY: number; ox: number; oy: number } | null>(null);
+  const frameDragRef = useRef<{
+    id: string;
+    startX: number;
+    startY: number;
+    ox: number;
+    oy: number;
+  } | null>(null);
+
+  // Fit the first frame into view on mount.
+  useEffect(() => {
+    const el = boardRef.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    if (!r.width || !r.height) return;
+    const z = Math.min(1, (r.height - 90) / FRAME_H, (r.width - 90) / FRAME_W);
+    setView({
+      zoom: z,
+      x: (r.width - FRAME_W * z) / 2,
+      y: Math.max(16, (r.height - FRAME_H * z) / 2 - 10),
+    });
+  }, []);
+
+  // Zoom to cursor with the mouse wheel (native listener so we can preventDefault).
+  useEffect(() => {
+    const el = boardRef.current;
+    if (!el) return;
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      const r = el.getBoundingClientRect();
+      const mx = e.clientX - r.left;
+      const my = e.clientY - r.top;
+      setView((v) => {
+        const factor = e.deltaY < 0 ? 1.1 : 1 / 1.1;
+        const nz = Math.min(3, Math.max(0.2, v.zoom * factor));
+        return { zoom: nz, x: mx - (mx - v.x) * (nz / v.zoom), y: my - (my - v.y) * (nz / v.zoom) };
+      });
+    };
+    el.addEventListener("wheel", onWheel, { passive: false });
+    return () => el.removeEventListener("wheel", onWheel);
+  }, []);
+
+  const boardPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    const el = boardRef.current;
+    if (!el) return;
+    // Clicking outside an open size dropdown just closes it; edit mode stays on.
+    if (openPlatform) {
+      setOpenPlatform(null);
+      return;
+    }
+    const r = el.getBoundingClientRect();
+    if (placing) {
+      // Drop a new frame centered on the cursor, then select it.
+      const wx = (e.clientX - r.left - view.x) / view.zoom - FRAME_W / 2;
+      const wy = (e.clientY - r.top - view.y) / view.zoom - FRAME_H / 2;
+      const id = "f" + Date.now();
+      setFrames((fs) => [
+        ...fs,
+        {
+          id,
+          x: wx,
+          y: wy,
+          platform: PLATFORMS[(fs.length + 1) % PLATFORMS.length],
+          aspect: "9:16",
+          contentLabel: "Reel",
+          w: 1080,
+          h: 1920,
+          headline: "Your headline goes here",
+        },
+      ]);
+      setSelectedFrameId(id);
+      setPlacing(false);
+      setGhost(null);
+      return;
+    }
+    // Empty-space click: deselect and start panning.
+    setSelectedFrameId(null);
+    panRef.current = { startX: e.clientX, startY: e.clientY, ox: view.x, oy: view.y };
+    el.setPointerCapture(e.pointerId);
+  };
+  // Begin dragging a frame (pointer is captured on the board so fast drags don't escape).
+  const onFrameDragStart = (frame: BoardFrameData, e: React.PointerEvent) => {
+    frameDragRef.current = {
+      id: frame.id,
+      startX: e.clientX,
+      startY: e.clientY,
+      ox: frame.x,
+      oy: frame.y,
+    };
+    boardRef.current?.setPointerCapture(e.pointerId);
+  };
+  const boardPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    const el = boardRef.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    if (placing) setGhost({ x: e.clientX - r.left, y: e.clientY - r.top });
+    const fd = frameDragRef.current;
+    if (fd) {
+      const dx = (e.clientX - fd.startX) / view.zoom;
+      const dy = (e.clientY - fd.startY) / view.zoom;
+      setFrames((fs) =>
+        fs.map((f) => (f.id === fd.id ? { ...f, x: fd.ox + dx, y: fd.oy + dy } : f)),
+      );
+      return;
+    }
+    const p = panRef.current;
+    if (p)
+      setView((v) => ({
+        ...v,
+        x: p.ox + (e.clientX - p.startX),
+        y: p.oy + (e.clientY - p.startY),
+      }));
+  };
+  const boardPointerUp = () => {
+    frameDragRef.current = null;
+    panRef.current = null;
+  };
   const [platforms, setPlatforms] = useState({
     tiktok: true,
     youtube: true,
@@ -1969,67 +2387,200 @@ function Composer({
       />
 
       {/* CENTER */}
-      <div className="flex min-h-screen flex-col overflow-y-auto bg-muted px-6 py-6 lg:min-h-0 lg:h-full">
-        <div className="mx-auto flex w-full max-w-md items-center rounded-xl border border-border bg-card/80 p-1 shadow-sm">
-          {(
-            [
-              { id: "canvas", label: "Canvas Preview" },
-              { id: "clips", label: "AI Clips Generated" },
-            ] as const
-          ).map((t) => (
-            <button
-              key={t.id}
-              onClick={() => setTab(t.id)}
-              className={`flex-1 rounded-lg px-3 py-2 text-xs font-semibold transition ${tab === t.id ? "bg-primary text-white shadow shadow-primary/25" : "text-muted-foreground hover:text-foreground"}`}
-            >
-              {t.label}
-            </button>
-          ))}
-        </div>
-
+      <div className="flex min-h-screen flex-col overflow-y-auto bg-muted px-6 py-5 lg:min-h-0 lg:h-full">
         {tab === "canvas" ? (
-          <div className="mt-6 flex flex-1 flex-col items-center justify-center">
-            <h2 className="mb-5 text-center text-2xl font-black text-foreground">9:16 Reel</h2>
-            <div className="relative aspect-[9/16] w-full max-w-[368px] overflow-hidden rounded-[22px] shadow-[0_14px_30px_rgba(0,0,0,0.2)]">
-              <img
-                src={selectedAsset}
-                alt=""
-                className="absolute inset-0 h-full w-full object-cover"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-white/10" />
-              <div className="absolute inset-x-5 bottom-[64px]">
-                <textarea
-                  value={overlayText}
-                  onChange={(e) => setOverlayText(e.target.value)}
-                  className="w-full resize-none rounded-xl border border-white/30 bg-black/35 p-3 text-center text-2xl font-black leading-tight text-white outline-none backdrop-blur-md focus:border-primary"
-                  rows={2}
+          <div
+            ref={boardRef}
+            onPointerDown={boardPointerDown}
+            onPointerMove={boardPointerMove}
+            onPointerUp={boardPointerUp}
+            className="relative min-h-[420px] flex-1 overflow-hidden rounded-2xl lg:min-h-0"
+            style={{ cursor: placing ? "crosshair" : "grab", touchAction: "none" }}
+          >
+            {/* World — pans and zooms; frames live in its coordinate space */}
+            <div
+              className="pointer-events-none absolute left-0 top-0 origin-top-left"
+              style={{ transform: `translate(${view.x}px, ${view.y}px) scale(${view.zoom})` }}
+            >
+              {frames.map((f) => (
+                <BoardFrame
+                  key={f.id}
+                  frame={f}
+                  image={selectedAsset}
+                  selected={selectedFrameId === f.id}
+                  placing={placing}
+                  onSelect={() => {
+                    setSelectedFrameId(f.id);
+                    setOpenPlatform(null);
+                  }}
+                  onHeadline={(h) =>
+                    setFrames((fs) => fs.map((x) => (x.id === f.id ? { ...x, headline: h } : x)))
+                  }
+                  onDragStart={(e) => onFrameDragStart(f, e)}
                 />
-              </div>
-            </div>
-            <div className="mt-7 flex h-12 w-full max-w-[520px] items-center justify-between rounded-2xl bg-card px-5 text-foreground shadow-[0_2px_8px_rgba(20,20,26,0.25)]">
-              {[
-                Music2,
-                Type,
-                Mic,
-                Captions,
-                FileText,
-                SlidersHorizontal,
-                Crop,
-                PanelRightClose,
-                Trash2,
-              ].map((Icon, index) => (
-                <button
-                  key={index}
-                  className="grid h-9 w-9 place-items-center rounded-lg transition hover:bg-primary/10"
-                  aria-label="Editor tool"
-                >
-                  <Icon className="h-5 w-5" />
-                </button>
               ))}
+            </div>
+
+            {/* Ghost frame trailing the cursor while placing (CapCut-style + badge) */}
+            {placing && ghost && (
+              <div
+                className="pointer-events-none absolute rounded-xl border-2 border-dashed border-primary bg-primary/5"
+                style={{
+                  left: ghost.x - (FRAME_W * view.zoom) / 2,
+                  top: ghost.y - (FRAME_H * view.zoom) / 2,
+                  width: FRAME_W * view.zoom,
+                  height: FRAME_H * view.zoom,
+                }}
+              >
+                <span className="absolute left-1.5 top-1.5 grid h-6 w-6 place-items-center rounded-md bg-primary text-white shadow">
+                  <Plus className="h-4 w-4" />
+                </span>
+              </div>
+            )}
+
+            {/* Upper platform toolbar — anchored above the selected frame.
+                Rendered in screen space so it stays a constant size (font/size don't
+                shrink on zoom); its position tracks the frame through pan/zoom/drag. */}
+            {(() => {
+              const sf = frames.find((f) => f.id === selectedFrameId);
+              if (!sf) return null;
+              const barX = view.x + (sf.x + (sf.w * DISPLAY_SCALE) / 2) * view.zoom;
+              const barY = view.y + sf.y * view.zoom - 8;
+              const openEntry = openPlatform
+                ? PLATFORMS.find((p) => p.label === openPlatform)
+                : null;
+              return (
+                <div
+                  onPointerDown={(e) => e.stopPropagation()}
+                  className="absolute z-30 -translate-x-1/2 -translate-y-full"
+                  style={{ left: barX, top: barY, cursor: "default" }}
+                >
+                  <div className="relative flex items-center gap-0.5 rounded-2xl border border-border bg-card px-2 py-1.5 shadow-lg">
+                    {PLATFORMS.map((p) => (
+                      <ToolbarButton
+                        key={p.label}
+                        label={p.label}
+                        Icon={p.Icon}
+                        onClick={() =>
+                          setOpenPlatform((prev) => (prev === p.label ? null : p.label))
+                        }
+                      />
+                    ))}
+                    <span className="mx-1 h-6 w-px shrink-0 bg-border" />
+                    <ToolbarButton label="Settings" Icon={MoreVertical} />
+
+                    {/* Platform size dropdown — drops below the bar, left-aligned to it */}
+                    {openEntry && (
+                      <div className="absolute left-0 top-full mt-2 max-h-[55vh] w-64 overflow-y-auto rounded-xl border border-border bg-popover p-1 text-popover-foreground shadow-xl">
+                        {PLATFORM_SIZES[openEntry.label]?.map((opt, i) => {
+                          const active = sf.w === opt.w && sf.h === opt.h;
+                          return (
+                            <button
+                              key={`${opt.content}-${i}`}
+                              onClick={() => {
+                                setFrames((fs) =>
+                                  fs.map((x) =>
+                                    x.id === sf.id
+                                      ? {
+                                          ...x,
+                                          platform: openEntry,
+                                          aspect: opt.aspect,
+                                          contentLabel: opt.oneWord,
+                                          w: opt.w,
+                                          h: opt.h,
+                                        }
+                                      : x,
+                                  ),
+                                );
+                                setOpenPlatform(null);
+                              }}
+                              className="flex w-full items-center justify-between gap-3 rounded-lg px-2.5 py-2 text-left transition hover:bg-muted"
+                            >
+                              <span className="flex min-w-0 items-center gap-2 text-sm text-foreground">
+                                {active ? (
+                                  <Check className="h-4 w-4 shrink-0 text-primary" />
+                                ) : (
+                                  <span className="w-4 shrink-0" />
+                                )}
+                                <span className="truncate">{opt.content}</span>
+                              </span>
+                              <span className="shrink-0 text-xs text-muted-foreground">
+                                {opt.w} × {opt.h}
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* Zoom indicator */}
+            <div className="pointer-events-none absolute bottom-3 left-3 rounded-lg bg-card/90 px-2 py-1 text-xs font-semibold text-muted-foreground shadow">
+              {Math.round(view.zoom * 100)}%
+            </div>
+
+            {/* Lower editing toolbar with collapsible dock */}
+            <div
+              onPointerDown={(e) => e.stopPropagation()}
+              className="absolute bottom-3 left-1/2 flex h-14 -translate-x-1/2 items-center justify-center"
+              style={{ cursor: "default" }}
+            >
+              {/* Centered dock (slides to the right edge + fades when hidden) */}
+              <div
+                className={`group flex items-center gap-0.5 rounded-2xl border border-border bg-card px-2 py-1.5 shadow-lg transition-all duration-300 ${
+                  dockHidden ? "pointer-events-none translate-x-[130%] opacity-0" : "opacity-100"
+                }`}
+              >
+                {LOWER_TOOLS.map((t) => (
+                  <ToolbarButton
+                    key={t.label}
+                    label={t.label}
+                    Icon={t.Icon}
+                    onClick={
+                      t.label === "Frame"
+                        ? () => {
+                            setPlacing((p) => !p);
+                            setSelectedFrameId(null);
+                          }
+                        : undefined
+                    }
+                  />
+                ))}
+                {/* Hover reveals a divider + hide (chevron-right) button */}
+                <div className="flex items-center overflow-hidden opacity-0 [max-width:0px] transition-all duration-300 group-hover:opacity-100 group-hover:[max-width:44px]">
+                  <span className="mx-1 h-6 w-px shrink-0 bg-border" />
+                  <button
+                    type="button"
+                    onClick={() => setDockHidden(true)}
+                    aria-label="Hide toolbar"
+                    title="Hide toolbar"
+                    className="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-foreground/80 transition hover:bg-primary/10 hover:text-foreground"
+                  >
+                    <ChevronRight className="h-5 w-5" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Docked tab (fades in when hidden) */}
+              <button
+                type="button"
+                onClick={() => setDockHidden(false)}
+                aria-label="Show toolbar"
+                title="Show toolbar"
+                className={`group absolute right-[-14px] top-1/2 grid h-11 w-9 -translate-y-1/2 place-items-center rounded-l-xl border border-border bg-card shadow-md transition-all duration-300 ${
+                  dockHidden ? "opacity-100" : "pointer-events-none translate-x-full opacity-0"
+                }`}
+              >
+                <ChevronLeft className="h-5 w-5 group-hover:hidden" />
+                <Maximize2 className="hidden h-4 w-4 group-hover:block" />
+              </button>
             </div>
           </div>
         ) : (
-          <div className="mt-6 space-y-3">
+          <div className="mt-2 space-y-3">
             <p className="text-xs text-muted-foreground">
               3 AI-generated short clips from your source video. Click to preview in canvas.
             </p>
@@ -2085,17 +2636,17 @@ function Composer({
         <textarea
           value={caption}
           onChange={(e) => setCaption(e.target.value)}
-          className="mt-4 min-h-[158px] w-full resize-none rounded-[20px] border-0 bg-card p-5 text-sm font-bold text-foreground shadow-[0_2px_8px_rgba(26,24,35,0.16)] outline-none focus:ring-2 focus:ring-primary/40"
+          className="mt-3 min-h-[88px] w-full resize-none rounded-[20px] border-0 bg-card p-4 text-sm font-bold text-foreground shadow-[0_2px_8px_rgba(26,24,35,0.16)] outline-none focus:ring-2 focus:ring-primary/40"
         />
 
-        <div className="mt-6">
+        <div className="mt-5">
           <div className="flex items-center justify-between">
             <div className="text-base font-bold text-foreground">Edit Post Size & Send</div>
             <button className="text-sm font-semibold text-primary transition hover:text-primary/80">
               Edit Posts
             </button>
           </div>
-          <div className="mt-4 space-y-3">
+          <div className="mt-3 space-y-2">
             <ToggleRow
               icon={Music2}
               label="TikTok"
@@ -2129,7 +2680,7 @@ function Composer({
           </div>
         </div>
 
-        <div className="mt-9 rounded-[18px] bg-card p-4 shadow-[0_2px_8px_rgba(26,24,35,0.12)]">
+        <div className="mt-5 rounded-[18px] bg-card p-4 shadow-[0_2px_8px_rgba(26,24,35,0.12)]">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 text-base font-black text-foreground">
               <Sparkles className="h-5 w-5 text-primary" /> AI Features
