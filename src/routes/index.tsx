@@ -424,6 +424,10 @@ function OmniForgeApp() {
   const [view, setView] = useState<View>("metrics");
   const [composerSeed, setComposerSeed] = useState<ComposerSeed | null>(null);
   const [calendar, setCalendar] = useState(INITIAL_CALENDAR);
+  // Frames sent from the Composer, waiting in the Calendar sidebar to be scheduled.
+  const [sentPosts, setSentPosts] = useState<SentPost[]>([]);
+  // Sent posts that have been dragged onto a specific day.
+  const [scheduled, setScheduled] = useState<Record<string, SentPost[]>>({});
   // Light is the default (what users see on first login); choice persists.
   const [theme, setTheme] = useState<Theme>("light");
 
@@ -459,12 +463,18 @@ function OmniForgeApp() {
               seed={composerSeed}
               onExplore={() => setView("ideas")}
               onEditLibrary={() => setView("assetLibrary")}
-              onSchedule={(item) => {
-                setCalendar((c) => ({ ...c, Thu: [...c.Thu, item] }));
-              }}
+              onSendToCalendar={(posts) => setSentPosts((s) => [...s, ...posts])}
             />
           )}
-          {view === "calendar" && <CalendarView calendar={calendar} />}
+          {view === "calendar" && (
+            <CalendarView
+              calendar={calendar}
+              sentPosts={sentPosts}
+              setSentPosts={setSentPosts}
+              scheduled={scheduled}
+              setScheduled={setScheduled}
+            />
+          )}
           {view === "settings" && <SettingsView />}
           {view === "assetLibrary" && <FullAssetLibrary onBack={() => setView("composer")} />}
         </div>
@@ -1854,6 +1864,22 @@ type BoardFrameData = {
   headline: string;
 };
 
+// A frame sent from the Composer to the Calendar page's sidebar inventory.
+type SentPost = {
+  id: string;
+  platform: string;
+  Icon: IconType;
+  contentLabel: string;
+  aspect: string;
+  w: number;
+  h: number;
+  headline: string;
+  image: string;
+};
+
+// "Select to Send" lists these 5 by default; the Edit link can add the rest.
+const DEFAULT_SEND_PLATFORMS = ["TikTok", "Instagram", "Facebook", "YouTube", "LinkedIn"];
+
 // A single post frame placed on the infinite board (world coordinates).
 function BoardFrame({
   frame,
@@ -1937,16 +1963,12 @@ function Composer({
   seed,
   onExplore,
   onEditLibrary,
-  onSchedule,
+  onSendToCalendar,
 }: {
   seed: ComposerSeed | null;
   onExplore: () => void;
   onEditLibrary: () => void;
-  onSchedule: (item: {
-    caption: string;
-    thumb: string;
-    platform: "linkedin" | "instagram" | "twitter";
-  }) => void;
+  onSendToCalendar: (posts: SentPost[]) => void;
 }) {
   const [selectedAsset, setSelectedAsset] = useState<string>(
     seed?.thumbnail || ASSET_GROUPS[0].items[0].url,
@@ -2095,12 +2117,11 @@ function Composer({
     frameDragRef.current = null;
     panRef.current = null;
   };
-  const [platforms, setPlatforms] = useState({
-    tiktok: true,
-    youtube: true,
-    facebook: false,
-    linkedin: true,
-  });
+  // ----- "Select to Send" panel -----
+  const [sendPlatforms, setSendPlatforms] = useState<string[]>(DEFAULT_SEND_PLATFORMS);
+  const [openSend, setOpenSend] = useState<string | null>(null);
+  const [editOpen, setEditOpen] = useState(false);
+  const [checkedFrames, setCheckedFrames] = useState<string[]>([]);
   const [uploadedVideo, setUploadedVideo] = useState<string | null>(null);
 
   // Ideas card (collapsible AI Idea Engine)
@@ -2188,9 +2209,52 @@ function Composer({
     toast.success(`Processed "${f.name}" — 3 AI clips ready`);
   };
 
-  const approve = () => {
-    onSchedule({ caption: caption.slice(0, 60), thumb: selectedAsset, platform: "instagram" });
-    toast.success("Approved & scheduled to calendar");
+  // Turn a board frame into a post for the Calendar sidebar.
+  const toSentPost = (f: BoardFrameData): SentPost => ({
+    id: `${f.id}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    platform: f.platform.label,
+    Icon: f.platform.Icon,
+    contentLabel: f.contentLabel,
+    aspect: f.aspect,
+    w: f.w,
+    h: f.h,
+    headline: f.headline,
+    image: selectedAsset,
+  });
+
+  // Purple button: send only the checked sizes.
+  const sendChecked = () => {
+    const picked = frames.filter((f) => checkedFrames.includes(f.id));
+    if (!picked.length) {
+      toast.error("Select at least one size to send");
+      return;
+    }
+    onSendToCalendar(picked.map(toSentPost));
+    setCheckedFrames([]);
+    toast.success(`Sent ${picked.length} post${picked.length > 1 ? "s" : ""} to the calendar`);
+  };
+
+  // Outline button: send every frame on the board.
+  const sendAllFrames = () => {
+    if (!frames.length) {
+      toast.error("No frames on the board yet");
+      return;
+    }
+    onSendToCalendar(frames.map(toSentPost));
+    toast.success(`Sent all ${frames.length} frames to the calendar`);
+  };
+
+  // Group a platform's frames for the dropdown, numbering duplicate content types.
+  const sendItemsFor = (label: string) => {
+    const list = frames.filter((f) => f.platform.label === label);
+    const counts: Record<string, number> = {};
+    list.forEach((f) => (counts[f.contentLabel] = (counts[f.contentLabel] || 0) + 1));
+    const seen: Record<string, number> = {};
+    return list.map((f) => {
+      seen[f.contentLabel] = (seen[f.contentLabel] || 0) + 1;
+      const n = counts[f.contentLabel] > 1 ? ` ${seen[f.contentLabel]}` : "";
+      return { frame: f, display: `${f.contentLabel}${n}` };
+    });
   };
 
   return (
@@ -2631,77 +2695,175 @@ function Composer({
 
       {/* RIGHT */}
       <div className="relative flex h-auto flex-col overflow-y-auto bg-card p-7 lg:h-full">
-        <h3 className="text-base font-bold tracking-tight text-foreground">Publish Settings</h3>
-        <label className="mt-5 block text-base font-bold text-foreground">Caption</label>
-        <textarea
-          value={caption}
-          onChange={(e) => setCaption(e.target.value)}
-          className="mt-3 min-h-[88px] w-full resize-none rounded-[20px] border-0 bg-card p-4 text-sm font-bold text-foreground shadow-[0_2px_8px_rgba(26,24,35,0.16)] outline-none focus:ring-2 focus:ring-primary/40"
-        />
-
-        <div className="mt-5">
-          <div className="flex items-center justify-between">
-            <div className="text-base font-bold text-foreground">Edit Post Size & Send</div>
-            <button className="text-sm font-semibold text-primary transition hover:text-primary/80">
-              Edit Posts
-            </button>
-          </div>
-          <div className="mt-3 space-y-2">
-            <ToggleRow
-              icon={Music2}
-              label="TikTok"
-              checked={platforms.tiktok}
-              onChange={(v) => setPlatforms({ ...platforms, tiktok: v })}
-            />
-            <ToggleRow
-              icon={Facebook}
-              label="Facebook"
-              checked={platforms.facebook}
-              onChange={(v) => setPlatforms({ ...platforms, facebook: v })}
-            />
-            <ToggleRow
-              icon={Instagram}
-              label="Instagram"
-              checked={platforms.linkedin}
-              onChange={(v) => setPlatforms({ ...platforms, linkedin: v })}
-            />
-            <ToggleRow
-              icon={Youtube}
-              label="YouTube"
-              checked={platforms.youtube}
-              onChange={(v) => setPlatforms({ ...platforms, youtube: v })}
-            />
-            <ToggleRow
-              icon={Linkedin}
-              label="LinkedIn"
-              checked={platforms.linkedin}
-              onChange={(v) => setPlatforms({ ...platforms, linkedin: v })}
-            />
-          </div>
-        </div>
-
-        <div className="mt-5 rounded-[18px] bg-card p-4 shadow-[0_2px_8px_rgba(26,24,35,0.12)]">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2 text-base font-black text-foreground">
-              <Sparkles className="h-5 w-5 text-primary" /> AI Features
-            </div>
-            <ChevronDown className="h-4 w-4 text-primary" />
-          </div>
-          <div className="mt-4 grid grid-cols-3 rounded-full bg-muted p-1 text-xs font-bold text-muted-foreground">
+        {/* Caption Editor */}
+        <h3 className="text-base font-bold tracking-tight text-foreground">Caption Editor</h3>
+        <div className="mt-3 rounded-[18px] bg-card p-3 shadow-[0_2px_8px_rgba(26,24,35,0.12)]">
+          <div className="grid grid-cols-3 rounded-full bg-muted p-1 text-xs font-bold text-muted-foreground">
             <button className="rounded-full bg-card px-3 py-2 text-foreground shadow-sm">
               Captions
             </button>
             <button className="px-3 py-2">Script</button>
             <button className="px-3 py-2">Shorts</button>
           </div>
+          <button
+            onClick={() => toast("Auto-generating captions…")}
+            className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-xl border border-primary/40 py-2 text-sm font-bold text-primary transition hover:bg-primary/10"
+          >
+            <Type className="h-4 w-4" /> Auto-Generate Captions
+          </button>
+          <textarea
+            value={caption}
+            onChange={(e) => setCaption(e.target.value)}
+            className="mt-3 min-h-[104px] w-full resize-none rounded-[16px] border border-border bg-card p-3 text-sm font-bold text-foreground outline-none focus:ring-2 focus:ring-primary/40"
+          />
         </div>
 
-        <button
-          onClick={approve}
-          className="mt-auto inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-3 text-sm font-bold text-white shadow-lg shadow-primary/25 transition hover:brightness-110"
-        >
-          <Sparkles className="h-4 w-4" /> Approve & Schedule to Calendar
-        </button>
+        {/* Select to Send */}
+        <div className="mt-5">
+          <div className="flex items-center justify-between">
+            <div className="text-base font-bold text-foreground">Select to Send</div>
+            <div className="relative">
+              <button
+                onClick={() => setEditOpen((o) => !o)}
+                className="text-sm font-semibold text-primary transition hover:text-primary/80"
+              >
+                Edit
+              </button>
+              {editOpen && (
+                <>
+                  <div className="fixed inset-0 z-10" onClick={() => setEditOpen(false)} />
+                  <div className="absolute right-0 top-full z-20 mt-2 w-52 rounded-xl border border-border bg-popover p-1 text-popover-foreground shadow-xl">
+                    <div className="px-2 py-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                      Add platform
+                    </div>
+                    {PLATFORMS.filter((p) => !sendPlatforms.includes(p.label)).map((p) => (
+                      <button
+                        key={p.label}
+                        onClick={() => {
+                          setSendPlatforms((s) => [...s, p.label]);
+                          setEditOpen(false);
+                          toast.success(`${p.label} added to Select to Send`);
+                        }}
+                        className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-sm transition hover:bg-muted"
+                      >
+                        <Plus className="h-3.5 w-3.5 shrink-0 text-primary" />
+                        <p.Icon className="h-4 w-4 shrink-0" />
+                        <span className="truncate">{p.label}</span>
+                      </button>
+                    ))}
+                    {PLATFORMS.filter((p) => !sendPlatforms.includes(p.label)).length === 0 && (
+                      <p className="px-2 py-2 text-xs text-muted-foreground">
+                        All platforms added.
+                      </p>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+
+          <div className="mt-3 space-y-2">
+            {sendPlatforms.map((label) => {
+              const entry = PLATFORMS.find((p) => p.label === label);
+              if (!entry) return null;
+              const open = openSend === label;
+              const items = sendItemsFor(label);
+              const vertical = items.filter((i) => i.frame.h > i.frame.w);
+              const horizontal = items.filter((i) => i.frame.w >= i.frame.h);
+              const Row = ({ it }: { it: (typeof items)[number] }) => {
+                const on = checkedFrames.includes(it.frame.id);
+                return (
+                  <button
+                    onClick={() =>
+                      setCheckedFrames((c) =>
+                        c.includes(it.frame.id)
+                          ? c.filter((x) => x !== it.frame.id)
+                          : [...c, it.frame.id],
+                      )
+                    }
+                    className="flex w-full items-center justify-between gap-2 py-1.5"
+                  >
+                    <span className="flex min-w-0 items-center gap-2">
+                      <span
+                        className={`grid h-4 w-4 shrink-0 place-items-center rounded-full border-2 border-primary ${
+                          on ? "bg-primary" : ""
+                        }`}
+                      >
+                        {on && <Check className="h-2.5 w-2.5 text-white" />}
+                      </span>
+                      <span className="truncate text-sm text-muted-foreground">{it.display}</span>
+                    </span>
+                    <span className="shrink-0 text-sm font-bold text-foreground">
+                      {it.frame.aspect}
+                    </span>
+                  </button>
+                );
+              };
+              return (
+                <div
+                  key={label}
+                  className="rounded-[18px] bg-card shadow-[0_2px_6px_rgba(26,24,35,0.14)]"
+                >
+                  <button
+                    onClick={() => setOpenSend((o) => (o === label ? null : label))}
+                    className="flex w-full items-center justify-between px-4 py-3"
+                  >
+                    <span className="flex items-center gap-2.5 text-sm font-bold text-foreground">
+                      <entry.Icon className="h-4 w-4" /> {label}
+                    </span>
+                    <ChevronDown
+                      className={`h-4 w-4 text-primary transition-transform ${open ? "rotate-180" : ""}`}
+                    />
+                  </button>
+                  {open && (
+                    <div className="px-4 pb-3">
+                      <div className="text-sm font-bold text-foreground">Choose Sizes to Post</div>
+                      {items.length === 0 ? (
+                        <p className="mt-2 text-xs text-muted-foreground">
+                          No {label} frames yet — size a frame for {label} on the board.
+                        </p>
+                      ) : (
+                        <>
+                          {vertical.length > 0 && (
+                            <div className="mt-2">
+                              <div className="text-sm font-bold text-foreground">Vertical</div>
+                              {vertical.map((it) => (
+                                <Row key={it.frame.id} it={it} />
+                              ))}
+                            </div>
+                          )}
+                          {horizontal.length > 0 && (
+                            <div className="mt-2">
+                              <div className="text-sm font-bold text-foreground">Horizontal</div>
+                              {horizontal.map((it) => (
+                                <Row key={it.frame.id} it={it} />
+                              ))}
+                            </div>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="mt-auto space-y-2 pt-5">
+          <button
+            onClick={sendAllFrames}
+            className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-primary/50 py-3 text-sm font-bold text-primary transition hover:bg-primary/10"
+          >
+            <Sparkles className="h-4 w-4" /> Send All Frames to Calendar
+          </button>
+          <button
+            onClick={sendChecked}
+            className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-3 text-sm font-bold text-white shadow-lg shadow-primary/25 transition hover:brightness-110"
+          >
+            <Sparkles className="h-4 w-4" /> Approve & Schedule to Calendar
+          </button>
+        </div>
       </div>
 
       {/* "Use this idea?" confirmation modal */}
@@ -2776,35 +2938,6 @@ function ComposerResizeHandle({
         <SlidersHorizontal className="h-4 w-4 rotate-90" />
       </span>
     </button>
-  );
-}
-
-function ToggleRow({
-  icon: Icon,
-  label,
-  checked,
-  onChange,
-}: {
-  icon: typeof Music2;
-  label: string;
-  checked: boolean;
-  onChange: (v: boolean) => void;
-}) {
-  return (
-    <label className="flex cursor-pointer items-center justify-between rounded-[18px] bg-card px-5 py-3.5 shadow-[0_2px_6px_rgba(26,24,35,0.14)] transition hover:shadow-[0_4px_12px_rgba(26,24,35,0.18)]">
-      <span className="flex items-center gap-3 text-sm font-bold text-foreground">
-        <Icon className="h-4 w-4 text-foreground" /> {label}
-      </span>
-      <span className="flex items-center gap-2">
-        <ChevronDown className="h-4 w-4 text-primary" />
-        <input
-          type="checkbox"
-          className="sr-only"
-          checked={checked}
-          onChange={(e) => onChange(e.target.checked)}
-        />
-      </span>
-    </label>
   );
 }
 
@@ -3097,60 +3230,175 @@ function DetailRow({ label, value }: { label: string; value: string }) {
 }
 
 // ---------- CALENDAR ----------
-function CalendarView({ calendar }: { calendar: typeof INITIAL_CALENDAR }) {
+function CalendarView({
+  calendar,
+  sentPosts,
+  setSentPosts,
+  scheduled,
+  setScheduled,
+}: {
+  calendar: typeof INITIAL_CALENDAR;
+  sentPosts: SentPost[];
+  setSentPosts: React.Dispatch<React.SetStateAction<SentPost[]>>;
+  scheduled: Record<string, SentPost[]>;
+  setScheduled: React.Dispatch<React.SetStateAction<Record<string, SentPost[]>>>;
+}) {
   const [locked, setLocked] = useState(false);
+  const [inboxView, setInboxView] = useState<"grid" | "list">("grid");
   const days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-  return (
-    <div className="px-8 py-8">
-      <Header
-        title="Smart Marketing Calendar"
-        subtitle="Your week, fully orchestrated across platforms."
-      />
 
-      <button
-        onClick={() => {
-          setLocked(true);
-          toast.success("Next 5 posts armed for auto-publish");
-        }}
-        disabled={locked}
-        className={`mt-6 flex w-full items-center justify-between gap-4 rounded-2xl border p-5 text-left transition ${
-          locked
-            ? "border-emerald-500/40 bg-emerald-500/10"
-            : "border-primary/40 bg-primary/10 hover:bg-primary/15"
-        }`}
-      >
-        <div className="flex items-center gap-4">
-          <div
-            className={`grid h-12 w-12 place-items-center rounded-xl ${locked ? "bg-emerald-500" : "bg-primary"} text-white shadow-lg`}
-          >
-            {locked ? <ShieldCheck className="h-5 w-5" /> : <Sparkles className="h-5 w-5" />}
-          </div>
-          <div>
-            <div className="text-sm font-semibold">
-              {locked ? "All Posts Locked & Armed" : "One-Click Approve Next 5 Suggested Posts"}
-            </div>
-            <div className="text-xs text-muted-foreground">
-              {locked
-                ? "Auto-publishing on schedule across all connected channels."
-                : "AI selected the highest-performing slots this week."}
-            </div>
+  // Drop a sidebar post onto a day: schedule it and remove it from the inbox.
+  const dropOnDay = (day: string, e: React.DragEvent) => {
+    e.preventDefault();
+    const id = e.dataTransfer.getData("text/plain");
+    const post = sentPosts.find((p) => p.id === id);
+    if (!post) return;
+    setScheduled((s) => ({ ...s, [day]: [...(s[day] || []), post] }));
+    setSentPosts((ps) => ps.filter((p) => p.id !== id));
+    toast.success(`${post.platform} ${post.contentLabel} scheduled for ${day}`);
+  };
+
+  return (
+    <div className="flex flex-col lg:flex-row">
+      {/* LEFT — posts sent from the Post Composer, waiting to be scheduled */}
+      <aside className="w-full shrink-0 border-b border-border bg-card p-4 lg:min-h-[calc(100vh-4rem)] lg:w-72 lg:border-b-0 lg:border-r">
+        <div className="flex items-center justify-between">
+          <h3 className="text-base font-bold tracking-tight">Ready to Schedule</h3>
+          <div className="flex rounded-lg bg-muted p-0.5">
+            <button
+              onClick={() => setInboxView("grid")}
+              aria-label="Grid view"
+              className={`grid h-7 w-7 place-items-center rounded-md transition ${
+                inboxView === "grid" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground"
+              }`}
+            >
+              <LayoutGrid className="h-3.5 w-3.5" />
+            </button>
+            <button
+              onClick={() => setInboxView("list")}
+              aria-label="List view"
+              className={`grid h-7 w-7 place-items-center rounded-md transition ${
+                inboxView === "list" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground"
+              }`}
+            >
+              <Layers className="h-3.5 w-3.5" />
+            </button>
           </div>
         </div>
-        {!locked && <ArrowRight className="h-5 w-5 text-primary" />}
-      </button>
+        <p className="mt-1 text-[11px] text-muted-foreground">
+          Drag a post onto a day to schedule it.
+        </p>
 
-      <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-7">
-        {days.map((d, i) => (
-          <div key={d} className="glass-card flex min-h-[280px] flex-col rounded-2xl p-3">
-            <div className="mb-3 flex items-baseline justify-between border-b border-border pb-2">
-              <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                {d}
-              </span>
-              <span className="text-lg font-semibold">{18 + i}</span>
+        {sentPosts.length === 0 ? (
+          <p className="mt-8 text-center text-xs text-muted-foreground">
+            Nothing here yet. Send frames from the Post Composer.
+          </p>
+        ) : inboxView === "grid" ? (
+          <div className="mt-4 grid grid-cols-2 gap-2">
+            {sentPosts.map((p) => (
+              <div
+                key={p.id}
+                draggable
+                onDragStart={(e) => e.dataTransfer.setData("text/plain", p.id)}
+                className="cursor-grab overflow-hidden rounded-lg border border-border bg-card transition hover:border-primary active:cursor-grabbing"
+              >
+                <div className="relative h-24">
+                  <img
+                    src={p.image}
+                    alt=""
+                    className="absolute inset-0 h-full w-full object-cover"
+                  />
+                  <span className="absolute left-1 top-1 grid h-5 w-5 place-items-center rounded bg-black/60">
+                    <p.Icon className="h-3 w-3 text-white" />
+                  </span>
+                </div>
+                <div className="p-1.5">
+                  <div className="truncate text-[11px] font-semibold">{p.contentLabel}</div>
+                  <div className="text-[10px] text-muted-foreground">{p.aspect}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="mt-4 space-y-2">
+            {sentPosts.map((p) => (
+              <div
+                key={p.id}
+                draggable
+                onDragStart={(e) => e.dataTransfer.setData("text/plain", p.id)}
+                className="flex cursor-grab items-center gap-2 rounded-lg border border-border bg-card p-2 transition hover:border-primary active:cursor-grabbing"
+              >
+                <img src={p.image} alt="" className="h-9 w-9 shrink-0 rounded object-cover" />
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-xs font-semibold">
+                    {p.platform} · {p.contentLabel}
+                  </div>
+                  <div className="text-[10px] text-muted-foreground">
+                    {p.aspect} · {p.w}×{p.h}
+                  </div>
+                </div>
+                <p.Icon className="h-4 w-4 shrink-0 text-muted-foreground" />
+              </div>
+            ))}
+          </div>
+        )}
+      </aside>
+
+      {/* MAIN — the week */}
+      <div className="min-w-0 flex-1 px-8 py-8">
+        <Header
+          title="Smart Marketing Calendar"
+          subtitle="Your week, fully orchestrated across platforms."
+        />
+
+        <button
+          onClick={() => {
+            setLocked(true);
+            toast.success("Next 5 posts armed for auto-publish");
+          }}
+          disabled={locked}
+          className={`mt-6 flex w-full items-center justify-between gap-4 rounded-2xl border p-5 text-left transition ${
+            locked
+              ? "border-emerald-500/40 bg-emerald-500/10"
+              : "border-primary/40 bg-primary/10 hover:bg-primary/15"
+          }`}
+        >
+          <div className="flex items-center gap-4">
+            <div
+              className={`grid h-12 w-12 place-items-center rounded-xl ${locked ? "bg-emerald-500" : "bg-primary"} text-white shadow-lg`}
+            >
+              {locked ? <ShieldCheck className="h-5 w-5" /> : <Sparkles className="h-5 w-5" />}
             </div>
-            <div className="space-y-2">
-              {calendar[d]?.length ? (
-                calendar[d].map((p, idx) => (
+            <div>
+              <div className="text-sm font-semibold">
+                {locked ? "All Posts Locked & Armed" : "One-Click Approve Next 5 Suggested Posts"}
+              </div>
+              <div className="text-xs text-muted-foreground">
+                {locked
+                  ? "Auto-publishing on schedule across all connected channels."
+                  : "AI selected the highest-performing slots this week."}
+              </div>
+            </div>
+          </div>
+          {!locked && <ArrowRight className="h-5 w-5 text-primary" />}
+        </button>
+
+        <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-7">
+          {days.map((d, i) => (
+            <div
+              key={d}
+              onDragOver={(e) => e.preventDefault()}
+              onDrop={(e) => dropOnDay(d, e)}
+              className="glass-card flex min-h-[280px] flex-col rounded-2xl p-3 transition"
+            >
+              <div className="mb-3 flex items-baseline justify-between border-b border-border pb-2">
+                <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  {d}
+                </span>
+                <span className="text-lg font-semibold">{18 + i}</span>
+              </div>
+              <div className="space-y-2">
+                {calendar[d]?.map((p, idx) => (
                   <div
                     key={idx}
                     className="rounded-lg border border-border bg-secondary/40 p-2 transition hover:border-primary/50"
@@ -3169,15 +3417,40 @@ function CalendarView({ calendar }: { calendar: typeof INITIAL_CALENDAR }) {
                       <PlatformBadge platform={p.platform} small />
                     </div>
                   </div>
-                ))
-              ) : (
-                <div className="grid h-20 place-items-center rounded-lg border border-dashed border-border text-[11px] text-muted-foreground">
-                  No posts
-                </div>
-              )}
+                ))}
+
+                {/* Posts dragged in from the sidebar */}
+                {scheduled[d]?.map((p) => (
+                  <div
+                    key={p.id}
+                    className="rounded-lg border border-primary/40 bg-primary/5 p-2 transition hover:border-primary"
+                  >
+                    <div className="flex gap-2">
+                      <img
+                        src={p.image}
+                        alt=""
+                        className="h-10 w-10 shrink-0 rounded-md object-cover"
+                      />
+                      <p className="line-clamp-2 text-[11px] leading-snug text-foreground/90">
+                        {p.headline}
+                      </p>
+                    </div>
+                    <div className="mt-2 flex items-center gap-1.5 text-[10px] font-semibold text-muted-foreground">
+                      <p.Icon className="h-3 w-3" />
+                      {p.platform} · {p.contentLabel} · {p.aspect}
+                    </div>
+                  </div>
+                ))}
+
+                {!calendar[d]?.length && !scheduled[d]?.length && (
+                  <div className="grid h-20 place-items-center rounded-lg border border-dashed border-border text-[11px] text-muted-foreground">
+                    Drop a post here
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
-        ))}
+          ))}
+        </div>
       </div>
     </div>
   );
