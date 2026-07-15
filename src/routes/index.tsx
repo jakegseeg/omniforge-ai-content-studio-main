@@ -552,17 +552,16 @@ const METRIC_OPTIONS: { key: MetricKey; label: string; icon: typeof Heart }[] = 
   { key: "watchTime", label: "Watch Time", icon: Timer },
 ];
 
-const POST_PERFORMANCE: Record<
-  string,
-  {
-    title: string;
-    type: string;
-    date: string;
-    status: "up" | "down" | "flat";
-    summary: string;
-    values: Record<MetricKey, number[]>;
-  }[]
-> = {
+type PostPerformancePost = {
+  title: string;
+  type: string;
+  date: string;
+  status: "up" | "down" | "flat";
+  summary: string;
+  values: Record<MetricKey, number[]>;
+};
+
+const POST_PERFORMANCE: Record<string, PostPerformancePost[]> = {
   Instagram: [
     {
       title: "Launch Reel",
@@ -744,6 +743,106 @@ const POST_PERFORMANCE: Record<
   ],
 };
 
+const lastMetricValue = (post: PostPerformancePost, metricKey: MetricKey) =>
+  post.values[metricKey].at(-1) ?? 0;
+
+const metricLift = (post: PostPerformancePost, metricKey: MetricKey) => {
+  const values = post.values[metricKey];
+  return (values.at(-1) ?? 0) - (values[0] ?? 0);
+};
+
+const getPostPerformanceScore = (post: PostPerformancePost) => {
+  const finalEngagement =
+    lastMetricValue(post, "likes") +
+    lastMetricValue(post, "comments") * 2.2 +
+    lastMetricValue(post, "shares") * 2.6 +
+    lastMetricValue(post, "watchTime") * 1.4;
+  const growth =
+    metricLift(post, "likes") +
+    metricLift(post, "comments") * 2 +
+    metricLift(post, "shares") * 2.4 +
+    metricLift(post, "watchTime") * 1.2;
+
+  return Math.round(finalEngagement + growth);
+};
+
+const getRankedPosts = (posts: PostPerformancePost[]) =>
+  [...posts].sort((a, b) => getPostPerformanceScore(b) - getPostPerformanceScore(a)).slice(0, 5);
+
+const getMetricTone = (post: PostPerformancePost) => {
+  const commentLift = metricLift(post, "comments");
+  const shareLift = metricLift(post, "shares");
+  const likeLift = metricLift(post, "likes");
+
+  if (commentLift >= shareLift && commentLift >= likeLift) {
+    return "Conversation is the main driver, with comments carrying the post more than passive likes.";
+  }
+
+  if (shareLift >= commentLift && shareLift >= likeLift) {
+    return "Share behavior is strongest, which usually means the idea is practical enough for people to pass along.";
+  }
+
+  return "Likes are leading the response, so the creative is landing quickly even if deeper discussion is lighter.";
+};
+
+const getAiPostSummary = (post: PostPerformancePost, rank: number) => {
+  const comments = lastMetricValue(post, "comments");
+  const commentLift = metricLift(post, "comments");
+  const likes = lastMetricValue(post, "likes");
+  const shares = lastMetricValue(post, "shares");
+  const watchTime = lastMetricValue(post, "watchTime");
+  const score = getPostPerformanceScore(post);
+  const sentiment =
+    post.status === "down"
+      ? "Mixed response: early likes did not hold, and the comment signal suggests some audience friction or weaker relevance."
+      : commentLift >= 20
+        ? "Mostly positive: comments are growing quickly, which suggests people understood the value and had something to add."
+        : "Positive but quieter: likes are present, while the comment thread needs a stronger prompt to surface objections or praise.";
+  const concern =
+    post.status === "down"
+      ? "The drop-off suggests the hook or audience match weakened after the first few days."
+      : commentLift < 10
+        ? "The main miss is comment depth; viewers reacted, but fewer people added a point of view."
+        : "The risk is keeping the next post focused enough to repeat the same audience signal.";
+
+  return {
+    score,
+    headline: `#${rank} by blended performance`,
+    commentSummary: `Comment read: ${comments} total comments with ${commentLift >= 0 ? "+" : ""}${commentLift} growth. Audience response appears ${commentLift >= 20 ? "active and specific" : commentLift >= 10 ? "steady but not explosive" : "lighter than the reach suggests"}.`,
+    sentiment,
+    whyItWorked: `${getMetricTone(post)} Final snapshot: ${likes} likes, ${shares} shares, and ${watchTime} watch-time points.`,
+    whatToImprove: concern,
+  };
+};
+
+const getPlatformInsights = (platformName: string, posts: PostPerformancePost[]) => {
+  const rankedPosts = getRankedPosts(posts);
+  const topPost = rankedPosts[0];
+  const strongestMetric = (["comments", "shares", "watchTime", "likes"] as MetricKey[])
+    .map((metricKey) => ({
+      metricKey,
+      lift: rankedPosts.reduce((total, post) => total + metricLift(post, metricKey), 0),
+    }))
+    .sort((a, b) => b.lift - a.lift)[0];
+  const label = METRIC_OPTIONS.find((option) => option.key === strongestMetric?.metricKey)?.label;
+  const lowerVelocityPost = rankedPosts
+    .filter((post) => post.status !== "up")
+    .sort((a, b) => getPostPerformanceScore(a) - getPostPerformanceScore(b))[0];
+
+  return {
+    summary: topPost
+      ? `${platformName} is being pulled forward by "${topPost.title}". ${label ?? "Engagement"} is the strongest signal across the current top posts, so the next edit should preserve the post structure that made people respond.`
+      : "Once posts are connected, this panel will summarize what is working and what needs attention.",
+    winning: topPost
+      ? `${topPost.type} content is performing best when it has a fast payoff and a clear reason to comment or share.`
+      : "No top post available yet.",
+    opportunity: lowerVelocityPost
+      ? `"${lowerVelocityPost.title}" needs a sharper first frame or clearer question to lift comments.`
+      : "Keep testing follow-up posts while the current winners still have momentum.",
+    nextMove: `Draft two variants: one that asks for a specific comment, and one that makes the ${label?.toLowerCase() ?? "engagement"} payoff obvious in the first few seconds.`,
+  };
+};
+
 function PlatformMetrics() {
   const [selectedPlatformName, setSelectedPlatformName] = useState<string | null>(null);
   const selectedPlatform = PLATFORM_METRICS.find(
@@ -895,7 +994,9 @@ function PlatformMetricDetail({
 }) {
   const [selectedMetric, setSelectedMetric] = useState<MetricKey>("likes");
   const posts = POST_PERFORMANCE[platform.name] ?? [];
-  const visiblePosts = posts.slice(0, 5);
+  const rankedPosts = getRankedPosts(posts);
+  const visiblePosts = rankedPosts;
+  const platformInsights = getPlatformInsights(platform.name, posts);
   const selectedMetricLabel =
     METRIC_OPTIONS.find((option) => option.key === selectedMetric)?.label ?? "Metric";
 
@@ -982,25 +1083,67 @@ function PlatformMetricDetail({
         <section className="glass-card rounded-2xl p-5">
           <div className="flex items-center justify-between gap-3">
             <div>
+              <h3 className="text-lg font-semibold tracking-tight">Insights</h3>
+              <p className="mt-1 text-xs text-muted-foreground">
+                AI-style readout from top post momentum and comment signals.
+              </p>
+            </div>
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-primary/20 bg-primary/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-primary">
+              <Sparkles className="h-3 w-3" /> Draft AI
+            </span>
+          </div>
+
+          <div className="mt-5 rounded-2xl border border-primary/15 bg-primary/10 p-4">
+            <div className="text-sm font-semibold text-primary">Overall summary</div>
+            <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+              {platformInsights.summary}
+            </p>
+          </div>
+
+          <div className="mt-3 grid gap-3">
+            {[
+              { label: "Where it is working", value: platformInsights.winning, icon: TrendingUp },
+              {
+                label: "Where to improve",
+                value: platformInsights.opportunity,
+                icon: SlidersHorizontal,
+              },
+              { label: "Recommended edit", value: platformInsights.nextMove, icon: Wand2 },
+            ].map((insight) => (
+              <div
+                key={insight.label}
+                className="rounded-xl border border-border bg-secondary/30 p-3"
+              >
+                <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  <insight.icon className="h-3.5 w-3.5 text-primary" /> {insight.label}
+                </div>
+                <p className="mt-2 text-sm leading-relaxed">{insight.value}</p>
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-6 flex items-center justify-between gap-3 border-t border-border pt-5">
+            <div>
               <h3 className="text-lg font-semibold tracking-tight">Tracked posts</h3>
               <p className="mt-1 text-xs text-muted-foreground">
-                Top posts are plotted by default.
+                Ranked by blended performance, then summarized from comment momentum.
               </p>
             </div>
             <span className="rounded-full border border-border bg-secondary/40 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-              Top 5
+              Top {rankedPosts.length}
             </span>
           </div>
 
           <div className="mt-5 space-y-3">
-            {posts.map((post, index) => {
+            {rankedPosts.map((post, index) => {
               const firstValue = post.values[selectedMetric][0];
               const lastValue = post.values[selectedMetric].at(-1) ?? firstValue;
               const movement = lastValue - firstValue;
+              const aiSummary = getAiPostSummary(post, index + 1);
               return (
                 <div
                   key={post.title}
-                  className="rounded-xl border border-border bg-secondary/30 p-3"
+                  className="rounded-xl border border-border bg-secondary/30 p-3 transition hover:border-primary/30 hover:bg-secondary/40"
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
@@ -1016,9 +1159,32 @@ function PlatformMetricDetail({
                     </div>
                     <TrendBadge status={post.status} value={movement} />
                   </div>
-                  <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
-                    {post.summary}
-                  </p>
+                  <div className="mt-3 flex flex-wrap items-center gap-2 text-[11px]">
+                    <span className="rounded-full bg-primary/10 px-2 py-1 font-semibold text-primary">
+                      {aiSummary.headline}
+                    </span>
+                    <span className="rounded-full border border-border bg-background/40 px-2 py-1 text-muted-foreground">
+                      Score {aiSummary.score}
+                    </span>
+                  </div>
+                  <div className="mt-3 space-y-2 text-xs leading-relaxed text-muted-foreground">
+                    <p>
+                      <span className="font-semibold text-foreground">Comment summary: </span>
+                      {aiSummary.commentSummary}
+                    </p>
+                    <p>
+                      <span className="font-semibold text-foreground">Audience sentiment: </span>
+                      {aiSummary.sentiment}
+                    </p>
+                    <p>
+                      <span className="font-semibold text-foreground">Why it worked: </span>
+                      {aiSummary.whyItWorked}
+                    </p>
+                    <p>
+                      <span className="font-semibold text-foreground">Potential edit: </span>
+                      {aiSummary.whatToImprove}
+                    </p>
+                  </div>
                 </div>
               );
             })}
@@ -1047,6 +1213,17 @@ function PostTrendChart({
   const plotWidth = width - padding.left - padding.right;
   const plotHeight = height - padding.top - padding.bottom;
   const colors = ["#a855f7", "#22d3ee", "#f472b6", "#34d399", "#f59e0b"];
+  const tooltipHideTimer = useRef<number | null>(null);
+  const [tooltipVisible, setTooltipVisible] = useState(false);
+  const [tooltipPoint, setTooltipPoint] = useState<{
+    postTitle: string;
+    day: string;
+    current: number;
+    delta: number;
+    color: string;
+    x: number;
+    y: number;
+  } | null>(null);
 
   const getPoint = (value: number, index: number) => {
     const x = padding.left + (index / (days.length - 1)) * plotWidth;
@@ -1054,10 +1231,26 @@ function PostTrendChart({
     return { x, y };
   };
 
+  const hideTooltip = () => {
+    setTooltipVisible(false);
+    if (tooltipHideTimer.current) window.clearTimeout(tooltipHideTimer.current);
+    tooltipHideTimer.current = window.setTimeout(() => setTooltipPoint(null), 180);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (tooltipHideTimer.current) window.clearTimeout(tooltipHideTimer.current);
+    };
+  }, []);
+
   return (
     <div className="mt-6 overflow-x-auto">
       <div className="min-w-[760px]">
-        <svg viewBox={`0 0 ${width} ${height}`} className="h-auto w-full">
+        <svg
+          viewBox={`0 0 ${width} ${height}`}
+          className="h-auto w-full overflow-visible"
+          onPointerLeave={hideTooltip}
+        >
           <line
             x1={padding.left}
             y1={padding.top}
@@ -1143,6 +1336,19 @@ function PostTrendChart({
                   const current = post.values[metricKey][pointIndex];
                   const previous = post.values[metricKey][Math.max(0, pointIndex - 1)];
                   const delta = current - previous;
+                  const showTooltip = () => {
+                    if (tooltipHideTimer.current) window.clearTimeout(tooltipHideTimer.current);
+                    setTooltipPoint({
+                      postTitle: post.title,
+                      day: days[pointIndex],
+                      current,
+                      delta,
+                      color,
+                      x: point.x,
+                      y: point.y,
+                    });
+                    window.requestAnimationFrame(() => setTooltipVisible(true));
+                  };
                   return (
                     <g key={`${post.title}-${pointIndex}`} className="group">
                       <circle
@@ -1152,48 +1358,57 @@ function PostTrendChart({
                         fill={color}
                         className="cursor-pointer stroke-background"
                         strokeWidth="3"
+                        onClick={showTooltip}
+                        onPointerEnter={showTooltip}
+                        onPointerLeave={hideTooltip}
                       />
-                      <foreignObject
-                        x={Math.min(point.x + 12, width - 190)}
-                        y={Math.max(point.y - 82, 8)}
-                        width="176"
-                        height="72"
-                        className="pointer-events-none opacity-0 transition group-hover:opacity-100"
-                      >
-                        <div className="rounded-xl border border-border bg-background/95 p-3 text-xs shadow-xl shadow-black/30">
-                          <div className="truncate font-semibold text-foreground">{post.title}</div>
-                          <div className="mt-1 text-muted-foreground">
-                            {days[pointIndex]} · {current}
-                          </div>
-                          <div className="mt-2 flex items-center gap-1 text-emerald-300">
-                            {delta > 0 ? (
-                              <TrendingUp className="h-3 w-3" />
-                            ) : delta < 0 ? (
-                              <TrendingDown className="h-3 w-3 text-rose-300" />
-                            ) : (
-                              <Minus className="h-3 w-3 text-muted-foreground" />
-                            )}
-                            <span
-                              className={
-                                delta < 0
-                                  ? "text-rose-300"
-                                  : delta === 0
-                                    ? "text-muted-foreground"
-                                    : ""
-                              }
-                            >
-                              {delta > 0 ? "+" : ""}
-                              {delta} from previous day
-                            </span>
-                          </div>
-                        </div>
-                      </foreignObject>
                     </g>
                   );
                 })}
               </g>
             );
           })}
+
+          {tooltipPoint && (
+            <foreignObject
+              x={Math.min(tooltipPoint.x + 14, width - 234)}
+              y={Math.max(tooltipPoint.y - 104, 10)}
+              width="220"
+              height="96"
+              className={`pointer-events-none overflow-visible transition-all duration-200 ease-out ${
+                tooltipVisible ? "opacity-100" : "translate-y-1 opacity-0"
+              }`}
+            >
+              <div className="h-full overflow-hidden rounded-2xl border border-white/35 bg-white/40 p-3 text-xs shadow-2xl shadow-slate-900/20 ring-1 ring-white/45 backdrop-blur-2xl supports-[backdrop-filter]:bg-white/25 dark:border-white/15 dark:bg-slate-950/35 dark:shadow-black/30 dark:ring-white/10">
+                <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_18%_12%,rgba(255,255,255,0.72),transparent_34%),linear-gradient(135deg,rgba(255,255,255,0.42),rgba(168,85,247,0.08),rgba(34,211,238,0.1))]" />
+                <div
+                  className="relative truncate text-sm font-bold"
+                  style={{ color: tooltipPoint.color }}
+                >
+                  {tooltipPoint.postTitle}
+                </div>
+                <div className="relative mt-1 font-semibold" style={{ color: tooltipPoint.color }}>
+                  {tooltipPoint.day} · {tooltipPoint.current}
+                </div>
+                <div
+                  className="relative mt-2 flex items-center gap-1.5"
+                  style={{ color: tooltipPoint.color }}
+                >
+                  {tooltipPoint.delta > 0 ? (
+                    <TrendingUp className="h-3.5 w-3.5" />
+                  ) : tooltipPoint.delta < 0 ? (
+                    <TrendingDown className="h-3.5 w-3.5" />
+                  ) : (
+                    <Minus className="h-3.5 w-3.5" />
+                  )}
+                  <span>
+                    {tooltipPoint.delta > 0 ? "+" : ""}
+                    {tooltipPoint.delta} from previous day
+                  </span>
+                </div>
+              </div>
+            </foreignObject>
+          )}
         </svg>
       </div>
     </div>
