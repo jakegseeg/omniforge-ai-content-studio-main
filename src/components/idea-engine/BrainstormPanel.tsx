@@ -7,6 +7,8 @@ import {
   IMPROVEMENT_SUGGESTIONS,
   PLACEHOLDER_IDEA_THUMB,
   firstAiReply,
+  generateFinalCaption,
+  generateHeadline,
   nextClosingMessage,
   pickEchoWord,
   type ChatMessage,
@@ -23,6 +25,7 @@ export function BrainstormPanel({
   onSendToComposer: (seed: IdeaSeed) => void;
 }) {
   const [ideaText, setIdeaText] = useState("");
+  const [ideaHashtags, setIdeaHashtags] = useState<string[]>([]);
   const [goal, setGoal] = useState<Goal>(GOAL_OPTIONS[0]);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isReplying, setIsReplying] = useState(false);
@@ -43,6 +46,7 @@ export function BrainstormPanel({
       return;
     }
     setIdeaText(prefillIdea.text);
+    setIdeaHashtags(prefillIdea.hashtags);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [prefillIdea]);
 
@@ -102,11 +106,13 @@ export function BrainstormPanel({
 
   const hasConversation = messages.length > 0;
 
+  // Builds the finished post content from the brainstorm — caption is what
+  // actually gets posted, title becomes the Composer canvas headline.
   const handleSendToComposer = () => {
     onSendToComposer({
-      caption: ideaText.trim(),
+      caption: generateFinalCaption(ideaText, goal, ideaHashtags),
       thumbnail: PLACEHOLDER_IDEA_THUMB,
-      title: `${goal} · Brainstormed Idea`,
+      title: generateHeadline(ideaText, goal),
     });
   };
 
@@ -123,7 +129,10 @@ export function BrainstormPanel({
       >
         <input
           value={ideaText}
-          onChange={(e) => setIdeaText(e.target.value)}
+          onChange={(e) => {
+            setIdeaText(e.target.value);
+            setIdeaHashtags([]);
+          }}
           disabled={hasConversation}
           placeholder="Describe your idea..."
           className="w-full rounded-xl border border-border bg-secondary/40 px-4 py-3 text-sm text-foreground outline-none placeholder:text-muted-foreground/70 focus:border-primary focus:ring-2 focus:ring-primary/30 disabled:opacity-70"

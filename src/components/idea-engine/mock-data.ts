@@ -28,6 +28,7 @@ export const PLACEHOLDER_IDEA_THUMB =
 // re-triggers the prefill effect.
 export type PrefillIdea = {
   text: string;
+  hashtags: string[];
   nonce: number;
 };
 
@@ -231,4 +232,50 @@ export function firstAiReply(userIdea: string, goal: Goal): string {
   const rationale = GOAL_RATIONALE[goal];
   const improvement = IMPROVEMENT_SUGGESTIONS[Math.floor(Math.random() * IMPROVEMENT_SUGGESTIONS.length)];
   return `That's a strong direction for ${goal.toLowerCase()}. Here's how it lands: ${rationale}. One thing I'd tighten up — ${improvement.toLowerCase()} Want me to sketch a follow-up angle, or do you have questions about the approach?`;
+}
+
+// ---------- FINAL POST CONTENT (Send to Composer) ----------
+// Backend integration point: a real implementation would ask the LLM to
+// produce the finished headline/caption from the full chat transcript
+// instead of this templated split-and-fill.
+function splitIdea(ideaText: string): { topic: string; detail: string } {
+  const idx = ideaText.indexOf(":");
+  if (idx === -1) {
+    const words = ideaText.trim().split(/\s+/);
+    return { topic: words.slice(0, 6).join(" "), detail: ideaText.trim() };
+  }
+  return { topic: ideaText.slice(0, idx).trim(), detail: ideaText.slice(idx + 1).trim() };
+}
+
+const HEADLINE_HOOKS: Record<Goal, (topic: string) => string> = {
+  "Effective Advertisement": (t) => `${t} — See Why It Works`,
+  "Marketing Campaign": (t) => `Introducing: ${t}`,
+  "Raise Awareness": (t) => `Let's Talk About ${t}`,
+  "Product Launch": (t) => `${t} Is Here`,
+  "Lead Generation": (t) => `Get Started With ${t}`,
+  "Brand Retention": (t) => `${t}, Just For You`,
+};
+
+const CAPTION_CTA: Record<Goal, string> = {
+  "Effective Advertisement": "Tap the link to see it for yourself.",
+  "Marketing Campaign": "Follow along all week for more.",
+  "Raise Awareness": "Share this if you agree.",
+  "Product Launch": "Available now — don't miss it.",
+  "Lead Generation": "Drop a comment or DM us to learn more.",
+  "Brand Retention": "Thanks for being here — more like this coming soon.",
+};
+
+// The headline that lands on the Composer canvas frame.
+export function generateHeadline(ideaText: string, goal: Goal): string {
+  const { topic } = splitIdea(ideaText);
+  return HEADLINE_HOOKS[goal](topic || "Your Next Post");
+}
+
+// The finished, ready-to-post caption that lands in Composer's Caption Editor.
+export function generateFinalCaption(ideaText: string, goal: Goal, hashtags: string[] = []): string {
+  const { topic, detail } = splitIdea(ideaText);
+  const body = detail && detail.toLowerCase() !== topic.toLowerCase() ? detail : topic;
+  const sentence = /[.!?]$/.test(body) ? body : `${body}.`;
+  const tagLine = hashtags.length ? `\n\n${hashtags.slice(0, 3).join(" ")}` : "";
+  return `${sentence} ${CAPTION_CTA[goal]}${tagLine}`;
 }

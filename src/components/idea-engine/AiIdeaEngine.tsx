@@ -31,7 +31,7 @@ export function AiIdeaEngine({
   };
 
   const handleSelectIdea = (idea: TrendIdea) => {
-    setPrefillIdea({ text: ideaToPrefillText(idea), nonce: Date.now() });
+    setPrefillIdea({ text: ideaToPrefillText(idea), hashtags: idea.hashtags, nonce: Date.now() });
     brainstormRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
