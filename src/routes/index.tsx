@@ -69,6 +69,13 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
 
 export const Route = createFileRoute("/")({
   component: OmniForgeApp,
@@ -327,7 +334,30 @@ function OmniForgeApp() {
   const [view, setView] = useState<View>("metrics");
   const [composerSeed, setComposerSeed] = useState<ComposerSeed | null>(null);
   const [pendingPost, setPendingPost] = useState<PendingPost | null>(null);
+  const [rescheduleOrigin, setRescheduleOrigin] = useState<{ day: string; index: number } | null>(
+    null,
+  );
   const [calendar, setCalendar] = useState(INITIAL_CALENDAR);
+  const [approvedQueue, setApprovedQueue] = useState<PendingPost[]>([]);
+  const [selectedQueueIndex, setSelectedQueueIndex] = useState<number | null>(null);
+  const [tileDrag, setTileDrag] = useState<{
+    day: string;
+    index: number;
+    post: (typeof INITIAL_CALENDAR)[string][number];
+    rect: { left: number; top: number; width: number };
+    startX: number;
+    startY: number;
+    phase: "holding" | "dragging";
+  } | null>(null);
+  const [hoveredSlot, setHoveredSlot] = useState<{ day: string; time: string } | null>(null);
+  const tileDragRef = useRef(tileDrag);
+  tileDragRef.current = tileDrag;
+  const hoveredSlotRef = useRef(hoveredSlot);
+  hoveredSlotRef.current = hoveredSlot;
+  const holdTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const floatingTileRef = useRef<HTMLDivElement>(null);
+  const lastPointRef = useRef({ x: 0, y: 0 });
+  const rafRef = useRef<number | null>(null);
   // Light is the default (what users see on first login); choice persists.
   const [theme, setTheme] = useState<Theme>("light");
 
@@ -348,6 +378,188 @@ function OmniForgeApp() {
     setView(v);
   };
 
+  const rescheduleTo = (
+    post: PendingPost,
+    origin: { day: string; index: number } | null,
+    day: string,
+    time: string,
+  ) => {
+    if (origin) {
+      setCalendar((c) => {
+        const next = { ...c };
+        next[origin.day] = next[origin.day].filter((_, i) => i !== origin.index);
+        next[day] = [...next[day], { ...post, time }];
+        return next;
+      });
+      toast.success(`Rescheduled to ${day} at ${time}`);
+    } else {
+      toast.success(`Scheduled for ${day} at ${time}`);
+      setCalendar((c) => ({ ...c, [day]: [...c[day], { ...post, time }] }));
+    }
+    setPendingPost(null);
+    setRescheduleOrigin(null);
+    setView("calendar");
+  };
+
+  const cancelSchedule = () => {
+    setPendingPost(null);
+    setRescheduleOrigin(null);
+    setView("calendar");
+  };
+
+  const assignQueuePost = (index: number, day: string, time: string) => {
+    const post = approvedQueue[index];
+    if (!post) return;
+    setCalendar((c) => ({ ...c, [day]: [...c[day], { ...post, time }] }));
+    setApprovedQueue((q) => q.filter((_, i) => i !== index));
+    setSelectedQueueIndex(null);
+    toast.success(`Scheduled for ${day} at ${time}`);
+  };
+
+  // Writes translate/scale straight to the DOM (no re-render) so the tile tracks the
+  // pointer at full frame rate instead of being throttled by React's render cycle.
+  const applyTileTransform = (clientX: number, clientY: number) => {
+    const current = tileDragRef.current;
+    const node = floatingTileRef.current;
+    if (!current || !node) return;
+    const dx = clientX - current.startX;
+    const dy = clientY - current.startY;
+    const scale = current.phase === "dragging" ? 1.06 : 1.03;
+    const rotate = current.phase === "dragging" ? "1.5deg" : "0deg";
+    node.style.transform = `translate(${dx}px, ${dy}px) scale(${scale}) rotate(${rotate})`;
+  };
+
+  // Sets the tile's starting transform once on mount; all later updates are
+  // applied imperatively via applyTileTransform so React re-renders (e.g. for the
+  // hovered-slot label) never reset the drag position mid-gesture.
+  useEffect(() => {
+    if (tileDrag && floatingTileRef.current) {
+      floatingTileRef.current.style.transform = "scale(1.03) rotate(0deg)";
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tileDrag !== null]);
+
+  const beginTilePress = (
+    e: React.MouseEvent | React.TouchEvent,
+    day: string,
+    index: number,
+    post: (typeof INITIAL_CALENDAR)[string][number],
+  ) => {
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    const point = "touches" in e ? e.touches[0] : (e as React.MouseEvent);
+    const startX = point.clientX;
+    const startY = point.clientY;
+    lastPointRef.current = { x: startX, y: startY };
+    hoveredSlotRef.current = null;
+    setHoveredSlot(null);
+    setTileDrag({
+      day,
+      index,
+      post,
+      rect: { left: rect.left, top: rect.top, width: rect.width },
+      startX,
+      startY,
+      phase: "holding",
+    });
+    holdTimerRef.current = setTimeout(() => {
+      setTileDrag((d) => (d ? { ...d, phase: "dragging" } : d));
+      setPendingPost(post);
+      setRescheduleOrigin({ day, index });
+      setView("schedule-post");
+      requestAnimationFrame(() => applyTileTransform(lastPointRef.current.x, lastPointRef.current.y));
+    }, 450);
+  };
+
+  useEffect(() => {
+    if (!tileDrag) return;
+
+    const handleMove = (clientX: number, clientY: number) => {
+      const current = tileDragRef.current;
+      if (!current) return;
+      if (current.phase === "holding") {
+        const dx = clientX - current.startX;
+        const dy = clientY - current.startY;
+        if (Math.hypot(dx, dy) > 12) {
+          if (holdTimerRef.current) clearTimeout(holdTimerRef.current);
+          holdTimerRef.current = null;
+          setTileDrag(null);
+          return;
+        }
+      }
+      lastPointRef.current = { x: clientX, y: clientY };
+      if (rafRef.current == null) {
+        rafRef.current = requestAnimationFrame(() => {
+          rafRef.current = null;
+          const { x, y } = lastPointRef.current;
+          applyTileTransform(x, y);
+          if (tileDragRef.current?.phase === "dragging") {
+            const el = document.elementFromPoint(x, y) as HTMLElement | null;
+            const slot = el?.closest<HTMLElement>("[data-slot-day][data-slot-time]");
+            const day = slot?.dataset.slotDay ?? null;
+            const time = slot?.dataset.slotTime ?? null;
+            const prev = hoveredSlotRef.current;
+            if ((prev?.day ?? null) !== day || (prev?.time ?? null) !== time) {
+              const next = day && time ? { day, time } : null;
+              hoveredSlotRef.current = next;
+              setHoveredSlot(next);
+            }
+          }
+        });
+      }
+    };
+
+    const endDrag = (clientX: number, clientY: number) => {
+      const current = tileDragRef.current;
+      if (holdTimerRef.current) {
+        clearTimeout(holdTimerRef.current);
+        holdTimerRef.current = null;
+      }
+      if (rafRef.current != null) {
+        cancelAnimationFrame(rafRef.current);
+        rafRef.current = null;
+      }
+      if (current?.phase === "dragging") {
+        const el = document.elementFromPoint(clientX, clientY) as HTMLElement | null;
+        const slot = el?.closest<HTMLElement>("[data-slot-day][data-slot-time]");
+        if (slot?.dataset.slotDay && slot?.dataset.slotTime) {
+          rescheduleTo(
+            current.post,
+            { day: current.day, index: current.index },
+            slot.dataset.slotDay,
+            slot.dataset.slotTime,
+          );
+        } else {
+          cancelSchedule();
+        }
+      }
+      setHoveredSlot(null);
+      setTileDrag(null);
+    };
+
+    const onMouseMove = (e: MouseEvent) => handleMove(e.clientX, e.clientY);
+    const onMouseUp = (e: MouseEvent) => endDrag(e.clientX, e.clientY);
+    const onTouchMove = (e: TouchEvent) => {
+      if (e.touches[0]) handleMove(e.touches[0].clientX, e.touches[0].clientY);
+    };
+    const onTouchEnd = (e: TouchEvent) => {
+      const t = e.changedTouches[0];
+      endDrag(t?.clientX ?? 0, t?.clientY ?? 0);
+    };
+
+    document.addEventListener("mousemove", onMouseMove);
+    document.addEventListener("mouseup", onMouseUp);
+    document.addEventListener("touchmove", onTouchMove, { passive: false });
+    document.addEventListener("touchend", onTouchEnd);
+    return () => {
+      document.removeEventListener("mousemove", onMouseMove);
+      document.removeEventListener("mouseup", onMouseUp);
+      document.removeEventListener("touchmove", onTouchMove);
+      document.removeEventListener("touchend", onTouchEnd);
+      if (rafRef.current != null) cancelAnimationFrame(rafRef.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tileDrag !== null]);
+
   if (!authed) return <PasswordWall onUnlock={() => setAuthed(true)} />;
 
   return (
@@ -363,8 +575,10 @@ function OmniForgeApp() {
               seed={composerSeed}
               onExplore={() => setView("ideas")}
               onApprove={(item) => {
-                setPendingPost(item);
-                setView("schedule-post");
+                setApprovedQueue((q) => [...q, item]);
+                setSelectedQueueIndex(null);
+                setView("calendar");
+                toast.success("Post approved — pick a time slot on the calendar");
               }}
             />
           )}
@@ -372,22 +586,77 @@ function OmniForgeApp() {
             <ScheduleCalendarView
               pendingPost={pendingPost}
               calendar={calendar}
-              onConfirm={(day, time) => {
-                toast.success(`Scheduled for ${day} at ${time}`);
-                setCalendar((c) => ({ ...c, [day]: [...c[day], { ...pendingPost, time }] }));
-                setPendingPost(null);
-                setView("calendar");
-              }}
-              onCancel={() => {
-                setPendingPost(null);
-                setView("calendar");
-              }}
+              isReschedule={!!rescheduleOrigin}
+              onConfirm={(day, time) => rescheduleTo(pendingPost, rescheduleOrigin, day, time)}
+              onCancel={cancelSchedule}
+              hoveredSlot={tileDrag?.phase === "dragging" ? hoveredSlot : null}
             />
           )}
-          {view === "calendar" && <CalendarView calendar={calendar} navigate={navigate} />}
+          {view === "calendar" && (
+            <CalendarView
+              calendar={calendar}
+              navigate={navigate}
+              onReschedule={(day, index, post) => {
+                setPendingPost(post);
+                setRescheduleOrigin({ day, index });
+                setView("schedule-post");
+              }}
+              onTilePressStart={beginTilePress}
+              activeDrag={tileDrag ? { day: tileDrag.day, index: tileDrag.index } : null}
+              approvedQueue={approvedQueue}
+              selectedQueueIndex={selectedQueueIndex}
+              onSelectQueuePost={setSelectedQueueIndex}
+              onAssignQueuePost={assignQueuePost}
+            />
+          )}
           {view === "settings" && <SettingsView />}
         </div>
       </main>
+
+      {tileDrag && (
+        <div
+          ref={floatingTileRef}
+          className={`pointer-events-none fixed z-[999] rounded-lg border border-primary/50 bg-card p-2 ring-2 ring-primary/40 backdrop-blur-sm will-change-transform ${
+            tileDrag.phase === "dragging" ? "shadow-2xl" : "shadow-lg"
+          }`}
+          style={{
+            left: tileDrag.rect.left,
+            top: tileDrag.rect.top,
+            width: tileDrag.rect.width,
+            transition: "box-shadow 150ms ease",
+          }}
+        >
+          <div className="flex gap-2">
+            <img
+              src={tileDrag.post.thumb}
+              alt=""
+              className="h-10 w-10 shrink-0 rounded-md object-cover"
+            />
+            <p className="line-clamp-2 text-[11px] leading-snug text-foreground/90">
+              {tileDrag.post.caption}
+            </p>
+          </div>
+          <div className="mt-2 flex items-center justify-between gap-2">
+            <PlatformBadge platform={tileDrag.post.platform} small />
+            {tileDrag.post.time && (
+              <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground">
+                <Clock className="h-3 w-3" /> {tileDrag.post.time}
+              </span>
+            )}
+          </div>
+          {tileDrag.phase === "dragging" && (
+            <div className="mt-2 rounded-md bg-primary/10 py-1 text-center text-[9px] font-semibold uppercase tracking-wider text-primary">
+              {hoveredSlot ? (
+                <>
+                  Reschedule to {hoveredSlot.day} at {hoveredSlot.time}
+                </>
+              ) : (
+                "Drop on a time slot"
+              )}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -2001,14 +2270,115 @@ function ToggleRow({
 }
 
 // ---------- CALENDAR ----------
+function ApprovedQueueSidebar({
+  queue,
+  selectedIndex,
+  onSelect,
+}: {
+  queue: PendingPost[];
+  selectedIndex: number | null;
+  onSelect: (index: number | null) => void;
+}) {
+  return (
+    <div className="glass-card sticky top-20 flex w-64 shrink-0 flex-col rounded-2xl p-3">
+      <div className="mb-3 flex items-center justify-between border-b border-border pb-2">
+        <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+          Approved Posts
+        </span>
+        <span className="rounded-full bg-primary/15 px-2 py-0.5 text-[10px] font-semibold text-primary">
+          {queue.length}
+        </span>
+      </div>
+
+      {queue.length === 0 ? (
+        <div className="grid h-20 place-items-center rounded-lg border border-dashed border-border px-2 text-center text-[11px] text-muted-foreground">
+          No posts waiting. Approve a post from the Composer.
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {queue.map((p, idx) => {
+            const selected = selectedIndex === idx;
+            return (
+              <button
+                key={idx}
+                type="button"
+                onClick={() => onSelect(selected ? null : idx)}
+                className={`w-full select-none rounded-lg border p-2 text-left transition ${
+                  selected
+                    ? "border-primary bg-primary/10 ring-2 ring-primary/40"
+                    : "border-border bg-secondary/40 hover:border-primary/50"
+                }`}
+              >
+                <div className="flex gap-2">
+                  <img
+                    src={p.thumb}
+                    alt=""
+                    className="h-10 w-10 shrink-0 rounded-md object-cover"
+                  />
+                  <p className="line-clamp-2 text-[11px] leading-snug text-foreground/90">
+                    {p.caption}
+                  </p>
+                </div>
+                <div className="mt-2 flex items-center justify-between gap-2">
+                  <PlatformBadge platform={p.platform} small />
+                  {selected && (
+                    <span className="text-[9px] font-semibold uppercase tracking-wider text-primary">
+                      Pick a slot
+                    </span>
+                  )}
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {selectedIndex !== null && (
+        <p className="mt-3 text-[11px] leading-snug text-muted-foreground">
+          Click a time slot on the calendar to schedule this post.
+        </p>
+      )}
+    </div>
+  );
+}
+
 function CalendarView({
   calendar,
   navigate,
+  onReschedule,
+  onTilePressStart,
+  activeDrag,
+  approvedQueue,
+  selectedQueueIndex,
+  onSelectQueuePost,
+  onAssignQueuePost,
 }: {
   calendar: typeof INITIAL_CALENDAR;
   navigate: (v: View, seed?: ComposerSeed) => void;
+  onReschedule: (
+    day: string,
+    index: number,
+    post: (typeof INITIAL_CALENDAR)[string][number],
+  ) => void;
+  onTilePressStart: (
+    e: React.MouseEvent | React.TouchEvent,
+    day: string,
+    index: number,
+    post: (typeof INITIAL_CALENDAR)[string][number],
+  ) => void;
+  activeDrag: { day: string; index: number } | null;
+  approvedQueue: PendingPost[];
+  selectedQueueIndex: number | null;
+  onSelectQueuePost: (index: number | null) => void;
+  onAssignQueuePost: (index: number, day: string, time: string) => void;
 }) {
   const [locked, setLocked] = useState(false);
+  const [previewPost, setPreviewPost] = useState<{
+    day: string;
+    date: number;
+    idx: number;
+    post: (typeof INITIAL_CALENDAR)[string][number];
+  } | null>(null);
   const days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
   return (
     <div className="px-8 py-8">
@@ -2049,83 +2419,240 @@ function CalendarView({
         {!locked && <ArrowRight className="h-5 w-5 text-primary" />}
       </button>
 
-      <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-7">
-        {days.map((d, i) => (
-          <div key={d} className="glass-card flex min-h-[280px] flex-col rounded-2xl p-3">
-            <div className="mb-3 flex items-baseline justify-between border-b border-border pb-2">
-              <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                {d}
-              </span>
-              <span className="text-lg font-semibold">{18 + i}</span>
-            </div>
-            <div className="space-y-2">
-              {calendar[d]?.length ? (
-                calendar[d].map((p, idx) => (
-                  <div
-                    key={idx}
-                    className="rounded-lg border border-border bg-secondary/40 p-2 transition hover:border-primary/50"
-                  >
-                    <div className="flex gap-2">
-                      <img
-                        src={p.thumb}
-                        alt=""
-                        className="h-10 w-10 shrink-0 rounded-md object-cover"
-                      />
-                      <p className="line-clamp-2 text-[11px] leading-snug text-foreground/90">
-                        {p.caption}
-                      </p>
-                    </div>
-                    <div className="mt-2 flex items-center justify-between gap-2">
-                      <PlatformBadge platform={p.platform} small />
-                      {p.time && (
-                        <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground">
-                          <Clock className="h-3 w-3" /> {p.time}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <div className="grid h-20 place-items-center rounded-lg border border-dashed border-border text-[11px] text-muted-foreground">
-                  No posts
-                </div>
-              )}
-              <button
-                onClick={() => navigate("composer", { caption: "", thumbnail: "", title: "" })}
-                aria-label={`Add post for ${d} ${18 + i}`}
-                className="grid h-8 w-full place-items-center rounded-lg border border-dashed border-border text-muted-foreground transition hover:border-primary/50 hover:text-primary"
+      <div className="mt-6 flex items-start gap-4">
+        <ApprovedQueueSidebar
+          queue={approvedQueue}
+          selectedIndex={selectedQueueIndex}
+          onSelect={onSelectQueuePost}
+        />
+
+        <div className="grid min-w-0 flex-1 grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-7">
+          {days.map((d, i) => {
+            const placing = selectedQueueIndex !== null;
+            return (
+              <div
+                key={d}
+                className={`glass-card flex min-h-[280px] flex-col rounded-2xl p-3 transition ${
+                  placing ? "border-2 border-dashed border-primary/30" : ""
+                }`}
               >
-                <Plus className="h-4 w-4" />
-              </button>
-            </div>
-          </div>
-        ))}
+                <div className="mb-3 flex items-baseline justify-between border-b border-border pb-2">
+                  <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                    {d}
+                  </span>
+                  <span className="text-lg font-semibold">{18 + i}</span>
+                </div>
+                <div className="space-y-2">
+                  {calendar[d]?.length ? (
+                    calendar[d].map((p, idx) => (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => setPreviewPost({ day: d, date: 18 + i, idx, post: p })}
+                        onMouseDown={(e) => onTilePressStart(e, d, idx, p)}
+                        onTouchStart={(e) => onTilePressStart(e, d, idx, p)}
+                        className={`w-full cursor-grab select-none rounded-lg border border-border bg-secondary/40 p-2 text-left transition hover:border-primary/50 active:cursor-grabbing ${
+                          activeDrag?.day === d && activeDrag?.index === idx
+                            ? "opacity-20"
+                            : "opacity-100"
+                        }`}
+                      >
+                        <div className="flex gap-2">
+                          <img
+                            src={p.thumb}
+                            alt=""
+                            className="h-10 w-10 shrink-0 rounded-md object-cover"
+                          />
+                          <p className="line-clamp-2 text-[11px] leading-snug text-foreground/90">
+                            {p.caption}
+                          </p>
+                        </div>
+                        <div className="mt-2 flex items-center justify-between gap-2">
+                          <PlatformBadge platform={p.platform} small />
+                          {p.time && (
+                            <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground">
+                              <Clock className="h-3 w-3" /> {p.time}
+                            </span>
+                          )}
+                        </div>
+                      </button>
+                    ))
+                  ) : (
+                    <div className="grid h-20 place-items-center rounded-lg border border-dashed border-border text-[11px] text-muted-foreground">
+                      No posts
+                    </div>
+                  )}
+
+                  {placing ? (
+                    <div className="max-h-40 space-y-1 overflow-y-auto pr-1">
+                      {TIME_SLOTS.map((time) => (
+                        <button
+                          key={time}
+                          type="button"
+                          data-slot-day={d}
+                          data-slot-time={time}
+                          onClick={() => onAssignQueuePost(selectedQueueIndex!, d, time)}
+                          className="flex w-full items-center gap-1.5 rounded-lg border border-border bg-secondary/20 px-2 py-1 text-left text-[11px] font-medium text-foreground/80 transition hover:border-primary/50 hover:bg-primary/10 hover:text-primary"
+                        >
+                          <Clock className="h-3 w-3" /> {time}
+                        </button>
+                      ))}
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => navigate("composer", { caption: "", thumbnail: "", title: "" })}
+                      aria-label={`Add post for ${d} ${18 + i}`}
+                      className="grid h-8 w-full place-items-center rounded-lg border border-dashed border-border text-muted-foreground transition hover:border-primary/50 hover:text-primary"
+                    >
+                      <Plus className="h-4 w-4" />
+                    </button>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
       </div>
+
+      <PostPreviewModal
+        entry={previewPost}
+        onClose={() => setPreviewPost(null)}
+        onEdit={(post) => {
+          setPreviewPost(null);
+          navigate("composer", { caption: post.caption, thumbnail: post.thumb, title: "" });
+        }}
+        onReschedule={(day, idx, post) => {
+          setPreviewPost(null);
+          onReschedule(day, idx, post);
+        }}
+      />
     </div>
+  );
+}
+
+function PostPreviewModal({
+  entry,
+  onClose,
+  onEdit,
+  onReschedule,
+}: {
+  entry: {
+    day: string;
+    date: number;
+    idx: number;
+    post: (typeof INITIAL_CALENDAR)[string][number];
+  } | null;
+  onClose: () => void;
+  onEdit: (post: (typeof INITIAL_CALENDAR)[string][number]) => void;
+  onReschedule: (
+    day: string,
+    index: number,
+    post: (typeof INITIAL_CALENDAR)[string][number],
+  ) => void;
+}) {
+  return (
+    <Dialog open={!!entry} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="max-w-md">
+        {entry && (
+          <>
+            <DialogHeader>
+              <DialogTitle>Scheduled Post</DialogTitle>
+            </DialogHeader>
+
+            <img
+              src={entry.post.thumb}
+              alt=""
+              className="h-48 w-full rounded-lg object-cover"
+            />
+
+            <div className="flex items-center justify-between gap-2">
+              <PlatformBadge platform={entry.post.platform} />
+              <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                <CalendarIcon className="h-3.5 w-3.5" />
+                {entry.day} {entry.date}
+                {entry.post.time && (
+                  <>
+                    <span className="mx-0.5">·</span>
+                    <Clock className="h-3.5 w-3.5" />
+                    {entry.post.time}
+                  </>
+                )}
+              </span>
+            </div>
+
+            <p className="rounded-lg border border-border bg-secondary/40 p-3 text-sm leading-relaxed text-foreground/90">
+              {entry.post.caption}
+            </p>
+
+            <DialogFooter>
+              <button
+                onClick={onClose}
+                className="rounded-lg border border-border px-4 py-2 text-sm font-medium transition hover:bg-secondary/60"
+              >
+                Close
+              </button>
+              <button
+                onClick={() => onReschedule(entry.day, entry.idx, entry.post)}
+                className="flex items-center justify-center gap-2 rounded-lg border border-border px-4 py-2 text-sm font-semibold transition hover:bg-secondary/60"
+              >
+                <Repeat className="h-4 w-4" />
+                Reschedule
+              </button>
+              <button
+                onClick={() => onEdit(entry.post)}
+                className="flex items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition hover:opacity-90"
+              >
+                <Wand2 className="h-4 w-4" />
+                Edit in Composer
+              </button>
+            </DialogFooter>
+          </>
+        )}
+      </DialogContent>
+    </Dialog>
   );
 }
 
 function ScheduleCalendarView({
   pendingPost,
   calendar,
+  isReschedule,
   onConfirm,
   onCancel,
+  hoveredSlot,
 }: {
   pendingPost: PendingPost;
   calendar: typeof INITIAL_CALENDAR;
+  isReschedule?: boolean;
   onConfirm: (day: string, time: string) => void;
   onCancel: () => void;
+  hoveredSlot?: { day: string; time: string } | null;
 }) {
   const days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+  const [dragging, setDragging] = useState(false);
   return (
     <TooltipProvider delayDuration={150}>
       <div className="flex h-[calc(100vh-4rem)] flex-col overflow-y-auto px-8 py-8">
         <Header
-          title="Choose a Time to Publish"
-          subtitle="Highlighted slots are AI-recommended for this post."
+          title={isReschedule ? "Drag to a New Time" : "Choose a Time to Publish"}
+          subtitle={
+            isReschedule
+              ? "Drag the post below onto a slot, or click a slot to confirm."
+              : "Highlighted slots are AI-recommended for this post."
+          }
         />
 
-        <div className="mt-6 flex items-center gap-4 rounded-2xl border border-primary/30 bg-primary/5 p-4">
+        <div
+          draggable
+          onDragStart={(e) => {
+            setDragging(true);
+            e.dataTransfer.effectAllowed = "move";
+          }}
+          onDragEnd={() => setDragging(false)}
+          className={`mt-6 flex cursor-grab items-center gap-4 rounded-2xl border border-primary/30 bg-primary/5 p-4 transition active:cursor-grabbing ${
+            dragging ? "opacity-40" : ""
+          }`}
+        >
           <img
             src={pendingPost.thumb}
             alt=""
@@ -2169,14 +2696,25 @@ function ScheduleCalendarView({
                 <div className="flex min-h-0 flex-1 flex-col gap-1.5 overflow-y-auto pr-1">
                   {TIME_SLOTS.map((time) => {
                     const rec = recommended.find((r) => r.time === time);
+                    const isHovered = hoveredSlot?.day === d && hoveredSlot?.time === time;
                     const slotButton = (
                       <button
                         key={time}
+                        data-slot-day={d}
+                        data-slot-time={time}
                         onClick={() => onConfirm(d, time)}
+                        onDragOver={(e) => e.preventDefault()}
+                        onDrop={(e) => {
+                          e.preventDefault();
+                          setDragging(false);
+                          onConfirm(d, time);
+                        }}
                         className={`w-full rounded-lg border px-2.5 py-1.5 text-left text-[11px] font-medium transition ${
-                          rec
-                            ? "border-primary/40 bg-primary/10 text-primary hover:bg-primary/20"
-                            : "border-border bg-secondary/20 text-foreground/80 hover:border-primary/40 hover:bg-secondary/40"
+                          isHovered
+                            ? "scale-[1.04] border-primary bg-primary text-primary-foreground shadow-lg shadow-primary/30"
+                            : rec
+                              ? "border-primary/40 bg-primary/10 text-primary hover:bg-primary/20"
+                              : "border-border bg-secondary/20 text-foreground/80 hover:border-primary/40 hover:bg-secondary/40"
                         }`}
                       >
                         <span className="flex items-center justify-between">
