@@ -83,15 +83,16 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { AiIdeaEngine } from "@/components/idea-engine/AiIdeaEngine";
 
 export const Route = createFileRoute("/")({
   component: OmniForgeApp,
 });
 
-type View =
+export type View =
   "metrics" | "dashboard" | "ideas" | "composer" | "calendar" | "settings" | "assetLibrary";
 
-interface ComposerSeed {
+export interface ComposerSeed {
   caption: string;
   thumbnail: string;
   title: string;
@@ -679,7 +680,7 @@ function OmniForgeApp() {
         <div key={view} className="animate-in fade-in slide-in-from-bottom-2 duration-300">
           {view === "metrics" && <PlatformMetrics />}
           {view === "dashboard" && <Dashboard navigate={navigate} />}
-          {view === "ideas" && <IdeaEngine navigate={navigate} />}
+          {view === "ideas" && <AiIdeaEngine navigate={navigate} />}
           {view === "composer" && (
             <Composer
               seed={composerSeed}
@@ -833,8 +834,8 @@ function TopNav({
             <DropdownMenuItem onClick={() => toast("Switch project — coming soon")}>
               <Repeat className="mr-2 h-4 w-4" /> Switch Projects
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => toast("Create project — coming soon")}>
-              <FolderPlus className="mr-2 h-4 w-4" /> Create Project
+            <DropdownMenuItem onClick={() => navigate("ideas")}>
+              <FolderPlus className="mr-2 h-4 w-4" /> Create New Project
             </DropdownMenuItem>
 
             <DropdownMenuSeparator />
@@ -1971,138 +1972,6 @@ function Dashboard({ navigate }: { navigate: (v: View, seed?: ComposerSeed) => v
               </>
             )}
           </button>
-        </Card>
-      </div>
-    </div>
-  );
-}
-
-// ---------- IDEA ENGINE ----------
-function IdeaEngine({ navigate }: { navigate: (v: View, seed?: ComposerSeed) => void }) {
-  const [campaignGoal, setCampaignGoal] = useState("Product Launch");
-  const [brief, setBrief] = useState(
-    "Push our new AI scheduling feature to small business owners. Tone: confident, friendly.",
-  );
-
-  const steps = useMemo(
-    () => [
-      {
-        day: "Day 1",
-        platform: "LinkedIn Text Post",
-        icon: Linkedin,
-        color: "bg-[#0A66C2]",
-        caption:
-          "We rebuilt our scheduler from the ground up. Here's why business owners are calling it 'the unfair advantage' — a 3-minute read on the workflow change that saved our team 10 hours a week.",
-        thumb: "https://images.unsplash.com/photo-1518173946687-a4c8892bbd9f?w=600",
-      },
-      {
-        day: "Day 3",
-        platform: "Instagram Visual Reel",
-        icon: Instagram,
-        color: "bg-gradient-to-tr from-[#F58529] via-[#DD2A7B] to-[#8134AF]",
-        caption:
-          "POV: Your social calendar fills itself. ✨ Tap to see the new AI scheduler in action.",
-        thumb: "https://images.unsplash.com/photo-1500534314209-a25ddb2bd429?w=600",
-      },
-      {
-        day: "Day 5",
-        platform: "X / Twitter Thread",
-        icon: Twitter,
-        color: "bg-foreground text-background",
-        caption:
-          "We shipped AI scheduling this week. 9 things we learned building it (a thread 🧵)",
-        thumb: "https://images.unsplash.com/photo-1505533321630-975218a5f66f?w=600",
-      },
-    ],
-    [],
-  );
-
-  return (
-    <div className="px-8 py-8">
-      <Header
-        title="AI Campaign Engine"
-        subtitle="Configure a goal. We'll architect the full content sequence."
-      />
-      <div className="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-[340px_1fr]">
-        <Card>
-          <CardHeader title="Configuration" badge="Inputs" />
-          <label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-            Campaign Goal
-          </label>
-          <select
-            value={campaignGoal}
-            onChange={(e) => setCampaignGoal(e.target.value)}
-            className="mt-2 w-full rounded-xl border border-border bg-secondary/40 px-3 py-2.5 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/30"
-          >
-            <option>Product Launch</option>
-            <option>Lead Generation</option>
-            <option>Brand Awareness</option>
-            <option>Customer Retention</option>
-          </select>
-          <label className="mt-4 block text-xs font-medium uppercase tracking-wider text-muted-foreground">
-            Brief
-          </label>
-          <textarea
-            value={brief}
-            onChange={(e) => setBrief(e.target.value)}
-            className="mt-2 min-h-[140px] w-full resize-none rounded-xl border border-border bg-secondary/40 p-3 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/30"
-          />
-          <button
-            onClick={() => toast.success("Sequence regenerated")}
-            className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-2.5 text-sm font-semibold text-primary-foreground shadow shadow-primary/30 transition hover:brightness-110"
-          >
-            <Sparkles className="h-4 w-4" /> Regenerate
-          </button>
-        </Card>
-
-        <Card>
-          <div className="mb-4 flex items-center justify-between">
-            <div>
-              <div className="text-[11px] font-semibold uppercase tracking-widest text-primary">
-                Generated Sequence
-              </div>
-              <h3 className="mt-1 text-xl font-semibold tracking-tight">
-                Campaign: App Feature Push
-              </h3>
-            </div>
-            <span className="rounded-full border border-border bg-secondary/40 px-3 py-1 text-xs text-muted-foreground">
-              {campaignGoal}
-            </span>
-          </div>
-          <div className="space-y-3">
-            {steps.map((s) => (
-              <div
-                key={s.day}
-                className="group flex flex-col gap-3 rounded-xl border border-border bg-secondary/30 p-4 md:flex-row md:items-center"
-              >
-                <img src={s.thumb} alt="" className="h-20 w-28 shrink-0 rounded-lg object-cover" />
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
-                    <span className={`grid h-6 w-6 place-items-center rounded-md ${s.color}`}>
-                      <s.icon className="h-3.5 w-3.5 text-white" />
-                    </span>
-                    <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                      {s.day} · {s.platform}
-                    </span>
-                  </div>
-                  <p className="mt-2 line-clamp-2 text-sm text-foreground/90">{s.caption}</p>
-                </div>
-                <button
-                  onClick={() => {
-                    toast.success(`${s.day} sent to Composer`);
-                    navigate("composer", {
-                      caption: s.caption,
-                      thumbnail: s.thumb,
-                      title: `${s.day} · ${s.platform}`,
-                    });
-                  }}
-                  className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground shadow shadow-primary/30 transition hover:brightness-110"
-                >
-                  Send to Composer <ArrowRight className="h-3.5 w-3.5" />
-                </button>
-              </div>
-            ))}
-          </div>
         </Card>
       </div>
     </div>
