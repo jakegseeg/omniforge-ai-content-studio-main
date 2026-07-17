@@ -43,8 +43,7 @@ const TREND_POOL: TrendIdea[] = [
   {
     id: "fifa-world-cup",
     title: "FIFA World Cup 2026",
-    description:
-      "World Cup match highlights, fan cams, and goal reels flood every feed daily.",
+    description: "World Cup match highlights, fan cams, and goal reels flood every feed daily.",
     hashtags: ["#WorldCup", "#Ronaldo", "#WorldCupHighlights"],
   },
   {
@@ -64,13 +63,15 @@ const TREND_POOL: TrendIdea[] = [
   {
     id: "booktok",
     title: "BookTok",
-    description: "Readers recommend emotional favorites and monthly reads through short-form videos.",
+    description:
+      "Readers recommend emotional favorites and monthly reads through short-form videos.",
     hashtags: ["#BookTok", "#CurrentlyReading", "#BookRec"],
   },
   {
     id: "healthy-recipes",
     title: "Healthy Recipes",
-    description: "Easy meal prep, nutritious recipes, and high-protein cooking videos dominate food feeds.",
+    description:
+      "Easy meal prep, nutritious recipes, and high-protein cooking videos dominate food feeds.",
     hashtags: ["#HealthyRecipes", "#MealPrep", "#HighProtein"],
   },
   {
@@ -94,25 +95,29 @@ const TREND_POOL: TrendIdea[] = [
   {
     id: "remote-work",
     title: "Remote Work Setups",
-    description: "Desk tours, productivity hacks, and hybrid-work debates trend across every platform.",
+    description:
+      "Desk tours, productivity hacks, and hybrid-work debates trend across every platform.",
     hashtags: ["#RemoteWork", "#DeskSetup", "#WFH"],
   },
   {
     id: "fitness-challenges",
     title: "Fitness Challenges",
-    description: "30-day challenges and quick home workouts drive some of the highest completion rates.",
+    description:
+      "30-day challenges and quick home workouts drive some of the highest completion rates.",
     hashtags: ["#FitnessChallenge", "#HomeWorkout", "#30DayChallenge"],
   },
   {
     id: "personal-finance",
     title: "Personal Finance Tips",
-    description: "Budgeting hacks, side-hustle breakdowns, and investing basics resonate with young audiences.",
+    description:
+      "Budgeting hacks, side-hustle breakdowns, and investing basics resonate with young audiences.",
     hashtags: ["#PersonalFinance", "#MoneyTips", "#SideHustle"],
   },
   {
     id: "pet-content",
     title: "Pet Content",
-    description: "Rescue stories, training tips, and everyday pet moments consistently outperform other niches.",
+    description:
+      "Rescue stories, training tips, and everyday pet moments consistently outperform other niches.",
     hashtags: ["#PetsOfInstagram", "#DogTok", "#RescueStory"],
   },
 ];
@@ -126,8 +131,9 @@ function shuffle<T>(items: T[]): T[] {
   return copy;
 }
 
-// Simulated AI trend generation — called on manual refresh and on the mocked
-// midnight schedule. Swap this out for a real backend/AI call later.
+// Simulated AI trend generation for the daily-at-midnight refresh, which
+// replaces the whole list with a fresh day's set. Swap this out for a real
+// backend/AI call later.
 export function generateTrends(count = 9): TrendIdea[] {
   return shuffle(TREND_POOL)
     .slice(0, count)
@@ -135,6 +141,51 @@ export function generateTrends(count = 9): TrendIdea[] {
 }
 
 export const INITIAL_TRENDS: TrendIdea[] = TREND_POOL.slice(0, 9);
+
+const MORE_IDEAS_ANGLES = [
+  "Fresh take",
+  "New angle",
+  "Trending twist",
+  "What's next",
+  "Deeper dive",
+  "Quick hit",
+];
+
+function makeTrendFrom(base: TrendIdea, title: string): TrendIdea {
+  return {
+    id: `${base.id}-more-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    title,
+    description: base.description,
+    hashtags: base.hashtags,
+  };
+}
+
+// Simulated AI trend generation for "Generate more ideas" — appended to the
+// existing list rather than replacing it. Uses up genuinely-unshown topics
+// first (as-is); only once those run out does it recycle pool items, always
+// with a distinct "angle" label so a recycled card never silently duplicates
+// a title already on screen. Swap this out for a real backend/AI call later.
+export function generateAdditionalTrends(existingTitles: string[], count = 9): TrendIdea[] {
+  const shown = new Set(existingTitles);
+  const picks: TrendIdea[] = [];
+
+  for (const base of shuffle(TREND_POOL.filter((t) => !shown.has(t.title)))) {
+    if (picks.length >= count) break;
+    picks.push(makeTrendFrom(base, base.title));
+    shown.add(base.title);
+  }
+
+  const cycle = shuffle(TREND_POOL);
+  let i = 0;
+  while (picks.length < count) {
+    const base = cycle[i % cycle.length];
+    const angle = MORE_IDEAS_ANGLES[i % MORE_IDEAS_ANGLES.length];
+    picks.push(makeTrendFrom(base, `${angle}: ${base.title}`));
+    i++;
+  }
+
+  return picks;
+}
 
 // Simulated "related ideas" generation for a single trend. Swap this out for
 // a real backend/AI call later.
@@ -230,7 +281,8 @@ export function pickEchoWord(text: string): string | null {
 
 export function firstAiReply(userIdea: string, goal: Goal): string {
   const rationale = GOAL_RATIONALE[goal];
-  const improvement = IMPROVEMENT_SUGGESTIONS[Math.floor(Math.random() * IMPROVEMENT_SUGGESTIONS.length)];
+  const improvement =
+    IMPROVEMENT_SUGGESTIONS[Math.floor(Math.random() * IMPROVEMENT_SUGGESTIONS.length)];
   return `That's a strong direction for ${goal.toLowerCase()}. Here's how it lands: ${rationale}. One thing I'd tighten up — ${improvement.toLowerCase()} Want me to sketch a follow-up angle, or do you have questions about the approach?`;
 }
 
@@ -272,7 +324,11 @@ export function generateHeadline(ideaText: string, goal: Goal): string {
 }
 
 // The finished, ready-to-post caption that lands in Composer's Caption Editor.
-export function generateFinalCaption(ideaText: string, goal: Goal, hashtags: string[] = []): string {
+export function generateFinalCaption(
+  ideaText: string,
+  goal: Goal,
+  hashtags: string[] = [],
+): string {
   const { topic, detail } = splitIdea(ideaText);
   const body = detail && detail.toLowerCase() !== topic.toLowerCase() ? detail : topic;
   const sentence = /[.!?]$/.test(body) ? body : `${body}.`;

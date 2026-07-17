@@ -12,11 +12,7 @@ function getGreeting(): string {
   return "Good evening";
 }
 
-export function AiIdeaEngine({
-  navigate,
-}: {
-  navigate: (v: View, seed?: ComposerSeed) => void;
-}) {
+export function AiIdeaEngine({ navigate }: { navigate: (v: View, seed?: ComposerSeed) => void }) {
   // Tracks the most recent idea sent toward the Composer, so the back arrow
   // can hand it along (spec: preserve data if any idea was generated/selected).
   const [lastIdea, setLastIdea] = useState<IdeaSeed | null>(null);

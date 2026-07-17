@@ -55,7 +55,9 @@ export function BrainstormPanel({
   // repeat itself within a session; winds down once both pools are exhausted.
   const nextAiReply = (userText: string): string => {
     const echo = pickEchoWord(userText);
-    const availableFollowUps = FOLLOW_UP_QUESTIONS.map((_, i) => i).filter((i) => !usedFollowUps.has(i));
+    const availableFollowUps = FOLLOW_UP_QUESTIONS.map((_, i) => i).filter(
+      (i) => !usedFollowUps.has(i),
+    );
     const availableImprovements = IMPROVEMENT_SUGGESTIONS.map((_, i) => i).filter(
       (i) => !usedImprovements.has(i),
     );
@@ -87,7 +89,10 @@ export function BrainstormPanel({
     setIsReplying(true);
     // Simulated latency — swap for a real backend/AI request later.
     setTimeout(() => {
-      setMessages((m) => [...m, { id: crypto.randomUUID(), role: "ai", text: firstAiReply(text, goal) }]);
+      setMessages((m) => [
+        ...m,
+        { id: crypto.randomUUID(), role: "ai", text: firstAiReply(text, goal) },
+      ]);
       setIsReplying(false);
     }, 1400);
   };
@@ -172,12 +177,13 @@ export function BrainstormPanel({
         <div className="mt-5 border-t border-border pt-5">
           <div className="max-h-80 space-y-3 overflow-y-auto scroll-smooth pr-1">
             {messages.map((m) => (
-              <div key={m.id} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
+              <div
+                key={m.id}
+                className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}
+              >
                 <div
                   className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-sm ${
-                    m.role === "user"
-                      ? "bg-primary text-white"
-                      : "bg-secondary/60 text-foreground"
+                    m.role === "user" ? "bg-primary text-white" : "bg-secondary/60 text-foreground"
                   }`}
                 >
                   {m.text}
