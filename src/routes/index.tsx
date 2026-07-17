@@ -63,6 +63,10 @@ import {
   Search,
   X,
   Check,
+  LayoutTemplate,
+  Star,
+  Palette,
+  Sticker,
   Ghost,
   Layers,
   MoreVertical,
@@ -335,7 +339,225 @@ const ASSET_TILES: AssetTile[] = [
   { label: "3D", icon: Box, bg: "from-[#f472b6] to-[#db2777]", cats: ["Images"] },
   { label: "Logo", icon: Hexagon, bg: "from-[#a78bfa] to-[#6d28d9]", cats: ["Logos", "Top"] },
   { label: "PDFs", icon: File, bg: "from-[#f87171] to-[#dc2626]", cats: [] },
+  // Added creator categories (the Full Asset Library only tracks Image/Logo/Video/PDF,
+  // so these fill common design-tool gaps without removing anything above).
+  {
+    label: "Templates",
+    icon: LayoutTemplate,
+    bg: "from-[#818cf8] to-[#4f46e5]",
+    cats: ["Templates"],
+  },
+  { label: "Text", icon: Type, bg: "from-[#94a3b8] to-[#475569]", cats: ["Templates"] },
+  { label: "Icons", icon: Star, bg: "from-[#fbbf24] to-[#f59e0b]", cats: ["Images"] },
+  { label: "Stickers", icon: Sticker, bg: "from-[#fb7185] to-[#e11d48]", cats: ["Images"] },
+  { label: "Backgrounds", icon: ImageIcon, bg: "from-[#2dd4bf] to-[#0d9488]", cats: ["Images"] },
+  {
+    label: "Gradients",
+    icon: Palette,
+    bg: "from-[#f472b6] via-[#a855f7] to-[#6366f1]",
+    cats: ["Images"],
+  },
+  { label: "Uploads", icon: Upload, bg: "from-[#38bdf8] to-[#0284c7]", cats: [] },
 ];
+
+// ---------- ASSET LIBRARY CATEGORY EXPLORER (in-sidebar detail view) ----------
+const EX_POOL = [
+  "https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=300",
+  "https://images.unsplash.com/photo-1500534314209-a25ddb2bd429?w=300",
+  "https://images.unsplash.com/photo-1505533321630-975218a5f66f?w=300",
+  "https://images.unsplash.com/photo-1473773508845-188df298d2d1?w=300",
+  "https://images.unsplash.com/photo-1518173946687-a4c8892bbd9f?w=300",
+  "https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?w=300",
+  "https://images.unsplash.com/photo-1419242902214-272b3f66ee7a?w=300",
+  "https://images.unsplash.com/photo-1426604966848-d7adac402bff?w=300",
+  "https://images.unsplash.com/photo-1500382017468-9049fed747ef?w=300",
+  "https://images.unsplash.com/photo-1483728642387-6c3bdd6c93e5?w=300",
+];
+// Fixed feeds shown for every category, then topic carousels.
+const EXPLORER_FIXED = ["Recently Used", "Trending", "Recommendations", "Lead", "Hook", "Effects"];
+const EXPLORER_TOPICS = ["People", "Food", "Aerial Shots", "Sky", "Nature", "Travel", "Cinematic"];
+
+// Metadata shown beneath each thumbnail, keyed by tile label
+// (from asset-library-dimensions-2026.md; cycled across cards in a row).
+const ASSET_META: Record<string, string[]> = {
+  Photos: ["1080 × 1080", "1080 × 1350", "1080 × 1920", "1920 × 1080"],
+  Videos: ["1080 × 1920", "1920 × 1080", "1080 × 1080", "1080 × 1350"],
+  Graphics: ["Scalable Vector", "1000 × 1000", "1080 × 1080", "1920 × 1080"],
+  Shapes: ["256 × 256", "512 × 512", "1000 × 1000"],
+  Icons: ["24 × 24", "48 × 48", "128 × 128", "512 × 512"],
+  Stickers: ["512 × 512", "1024 × 1024"],
+  Logo: ["1000 × 400", "600 × 1000", "1000 × 1000", "SVG"],
+  Backgrounds: ["1920 × 1080", "1080 × 1920", "1080 × 1080"],
+  Gradients: ["1920 × 1080", "1080 × 1920", "1080 × 1080"],
+  Animations: ["Vector", "1080 × 1080", "1080 × 1920"],
+  Audio: ["3:12 · MP3 · 128 BPM", "2:05 · WAV", "1:48 · MP3"],
+  Charts: ["1200 × 800", "1920 × 1080", "1080 × 1080"],
+  Tables: ["1200 × 800 · 4×6", "1200 × 800"],
+  Forms: ["600 × 900 · 6 fields", "500 × 700"],
+  Sheets: ["1600 × 900"],
+  Frames: ["1080 × 1080", "1080 × 1920", "1920 × 1080"],
+  Grids: ["9 cells · 1080²", "1200 × 1200"],
+  Mockups: ["1080 × 1920", "1920 × 1200", "2560 × 1440"],
+  "3D": ["1000 × 1000 · GLTF"],
+  PDFs: ["600 × 800 · 20 Pages"],
+  Templates: ["1080 × 1080", "1080 × 1920"],
+  Text: ["Montserrat Bold", "Inter Regular"],
+  Uploads: ["Original size"],
+};
+
+// Drop behavior classes (source of truth: asset-behavior-matrix-2026.md).
+// Photo/Video/Animation/PDF onto a frame → Fill/Fit/Place-Freely modal.
+const MODAL_TYPES = new Set(["Photos", "Videos", "Animations", "PDFs"]);
+// Icons/Stickers/Logo/Graphics/3D/Shapes → drop centered at original size, no modal.
+const OVERLAY_TYPES = new Set(["Icons", "Stickers", "Logo", "Graphics", "3D", "Shapes"]);
+// Backgrounds/Gradients → auto-fill the frame, no modal.
+const FILL_TYPES = new Set(["Backgrounds", "Gradients"]);
+
+function ExplorerRow({
+  title,
+  video,
+  pool,
+  meta,
+  onPick,
+}: {
+  title: string;
+  video: boolean;
+  pool: string[];
+  meta: string[];
+  onPick: (img: string) => void;
+}) {
+  return (
+    <section className="mt-5">
+      <div className="mb-2 flex items-center justify-between">
+        <h4 className="text-sm font-bold text-foreground">{title}</h4>
+        <button
+          onClick={() => toast(`See all ${title}`)}
+          className="text-xs font-semibold text-primary transition hover:text-primary/80"
+        >
+          See all
+        </button>
+      </div>
+      <div className="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        {pool.map((img, i) => (
+          <div key={i} className="shrink-0">
+            <button
+              draggable
+              onDragStart={(e) => {
+                e.dataTransfer.setData("text/omni-asset", img);
+                e.dataTransfer.effectAllowed = "copy";
+              }}
+              onClick={() => onPick(img)}
+              title="Click to place, or drag onto the canvas"
+              className={`relative block cursor-grab overflow-hidden rounded-lg border border-border transition hover:border-primary active:cursor-grabbing ${
+                video ? "h-28 w-[86px]" : "h-20 w-[104px]"
+              }`}
+            >
+              <img
+                src={img}
+                alt=""
+                draggable={false}
+                className="absolute inset-0 h-full w-full object-cover"
+              />
+              {video && (
+                <span className="absolute bottom-1 left-1 rounded bg-black/70 px-1 py-0.5 text-[9px] font-semibold text-white">
+                  {8 + i * 3}.0s
+                </span>
+              )}
+            </button>
+            <div className="mt-1 w-[104px] max-w-full truncate text-[9px] font-medium text-muted-foreground">
+              {meta[i % meta.length]}
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+// Replaces the whole left sidebar when an asset tile is opened.
+function AssetExplorer({
+  category,
+  onBack,
+  onPick,
+}: {
+  category: string;
+  onBack: () => void;
+  onPick: (image: string, type: string) => void;
+}) {
+  const [q, setQ] = useState("");
+  const video = category === "Videos" || category === "Animations";
+  const rows = [...EXPLORER_FIXED, ...EXPLORER_TOPICS];
+  const ql = q.trim().toLowerCase();
+  const visible = ql ? rows.filter((r) => r.toLowerCase().includes(ql)) : rows;
+  const poolFor = (seed: number) =>
+    EX_POOL.map((_, i) => EX_POOL[(i + seed) % EX_POOL.length]).slice(0, 8);
+
+  return (
+    <div className="shrink-0">
+      <button
+        onClick={onBack}
+        className="flex items-center gap-2 text-base font-bold text-foreground transition hover:text-primary"
+      >
+        <ArrowLeft className="h-4 w-4" /> {category}
+      </button>
+
+      <div className="mt-4 flex items-center gap-2 rounded-xl border border-border bg-secondary/50 px-3">
+        <Search className="h-4 w-4 text-muted-foreground" />
+        <input
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          placeholder={`Search ${category.toLowerCase()}`}
+          className="w-full bg-transparent py-2.5 text-sm outline-none placeholder:text-muted-foreground/70"
+        />
+      </div>
+
+      <div className="mt-3 flex gap-2">
+        <button
+          onClick={() => toast(`Generating ${category.toLowerCase()}…`)}
+          className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-primary/40 py-2 text-sm font-bold text-primary transition hover:bg-primary/10"
+        >
+          <Sparkles className="h-4 w-4" /> Generate <ChevronDown className="h-3.5 w-3.5" />
+        </button>
+        <button
+          onClick={() => toast("Searching library…")}
+          className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-primary py-2 text-sm font-bold text-white transition hover:brightness-110"
+        >
+          <Search className="h-4 w-4" /> Search
+        </button>
+      </div>
+
+      <div className="mt-3 flex gap-2 overflow-x-auto whitespace-nowrap pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        {EXPLORER_TOPICS.map((t) => (
+          <button
+            key={t}
+            onClick={() => setQ(q === t ? "" : t)}
+            className={`h-7 shrink-0 rounded-full px-3 text-xs font-semibold transition ${
+              q === t
+                ? "bg-primary text-white"
+                : "bg-secondary text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            {t}
+          </button>
+        ))}
+      </div>
+
+      {visible.map((title, i) => (
+        <ExplorerRow
+          key={title}
+          title={title}
+          video={video}
+          pool={poolFor(i)}
+          meta={ASSET_META[category] ?? ["1080 × 1080"]}
+          onPick={(img) => onPick(img, category)}
+        />
+      ))}
+      {visible.length === 0 && (
+        <p className="mt-6 text-center text-xs text-muted-foreground">No matches for “{q}”.</p>
+      )}
+    </div>
+  );
+}
 
 // ---------- FULL ASSET LIBRARY PAGE DATA ----------
 type LibraryAsset = {
@@ -2079,6 +2301,19 @@ type BoardFrameData = {
   w: number; // real px width
   h: number; // real px height
   headline: string;
+  content?: { image: string; fit: "fill" | "fit" }; // asset placed into this frame
+};
+
+// A free asset placed on the board (photo dropped on empty space, or an
+// icon/sticker/logo overlay). World coordinates; not clipped to a frame.
+type BoardObject = {
+  id: string;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  image: string;
+  overlay: boolean; // overlays (icons/stickers/logos) use object-contain
 };
 
 // A frame sent from the Composer to the Calendar page's sidebar inventory.
@@ -2102,18 +2337,14 @@ function BoardFrame({
   frame,
   image,
   selected,
-  placing,
-  onSelect,
   onHeadline,
-  onDragStart,
+  onItemPointerDown,
 }: {
   frame: BoardFrameData;
   image: string;
   selected: boolean;
-  placing: boolean;
-  onSelect: () => void;
   onHeadline: (h: string) => void;
-  onDragStart: (e: React.PointerEvent) => void;
+  onItemPointerDown: (e: React.PointerEvent) => void;
 }) {
   const dispW = frame.w * DISPLAY_SCALE;
   const dispH = frame.h * DISPLAY_SCALE;
@@ -2121,13 +2352,7 @@ function BoardFrame({
     <div
       className="pointer-events-auto absolute cursor-move"
       style={{ left: frame.x, top: frame.y, width: dispW }}
-      onPointerDown={(e) => {
-        if (!placing) {
-          e.stopPropagation();
-          onSelect();
-          onDragStart(e);
-        }
-      }}
+      onPointerDown={onItemPointerDown}
     >
       {/* Title — left-aligned to the frame; purple in edit mode, black otherwise */}
       <div
@@ -2145,7 +2370,20 @@ function BoardFrame({
         style={{ width: dispW, height: dispH }}
       >
         <div className="absolute inset-0 overflow-hidden rounded-[16px] shadow-[0_14px_30px_rgba(0,0,0,0.2)]">
-          <img src={image} alt="" className="absolute inset-0 h-full w-full object-cover" />
+          {frame.content ? (
+            <>
+              <div className="absolute inset-0 bg-muted" />
+              <img
+                src={frame.content.image}
+                alt=""
+                className={`absolute inset-0 h-full w-full ${
+                  frame.content.fit === "fill" ? "object-cover" : "object-contain"
+                }`}
+              />
+            </>
+          ) : (
+            <img src={image} alt="" className="absolute inset-0 h-full w-full object-cover" />
+          )}
           <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-white/10" />
           <div className="absolute inset-x-4 bottom-[8%]">
             <textarea
@@ -2207,8 +2445,8 @@ function Composer({
       headline: seed?.title || "Your headline goes here",
     },
   ]);
-  // The selected frame is in edit mode; null = nothing selected.
-  const [selectedFrameId, setSelectedFrameId] = useState<string | null>("f1");
+  // Selection is a set of frame + object ids (Phase 2 multi-select).
+  const [selection, setSelection] = useState<string[]>(["f1"]);
   const [view, setView] = useState({ zoom: 1, x: 0, y: 0 });
   const [placing, setPlacing] = useState(false);
   const [ghost, setGhost] = useState<{ x: number; y: number } | null>(null);
@@ -2218,13 +2456,51 @@ function Composer({
   const [dockHidden, setDockHidden] = useState(false);
   const boardRef = useRef<HTMLDivElement>(null);
   const panRef = useRef<{ startX: number; startY: number; ox: number; oy: number } | null>(null);
-  const frameDragRef = useRef<{
-    id: string;
+
+  // ----- Asset placement (Phase 1) -----
+  const [objects, setObjects] = useState<BoardObject[]>([]);
+  // Click-to-place: an asset is "armed" and waiting for a canvas click.
+  const [armed, setArmed] = useState<{ image: string; type: string } | null>(null);
+  // Fill/Fit/Place-Freely modal for media dropped on a frame.
+  const [placePrompt, setPlacePrompt] = useState<{
+    image: string;
+    type: string;
+    frameId: string;
+  } | null>(null);
+  const [rememberChoice, setRememberChoice] = useState(false);
+  const [placeDefaults, setPlaceDefaults] = useState<Record<string, "fill" | "fit" | "free">>({});
+  const [panning, setPanning] = useState(false);
+  // Editable zoom indicator.
+  const [zoomEditing, setZoomEditing] = useState(false);
+  const [zoomInput, setZoomInput] = useState("");
+
+  // ----- Phase 2: multi-select, marquee, context menu -----
+  const [lockedIds, setLockedIds] = useState<string[]>([]);
+  const [clipboard, setClipboard] = useState<{
+    frames: BoardFrameData[];
+    objects: BoardObject[];
+  } | null>(null);
+  const [marquee, setMarquee] = useState<{ x0: number; y0: number; x1: number; y1: number } | null>(
+    null,
+  );
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
+  const spaceRef = useRef(false);
+  const marqueeRef = useRef<{ x0: number; y0: number; base: string[] } | null>(null);
+  // Group drag: moves every selected frame/object together.
+  const groupDragRef = useRef<{
+    items: { id: string; kind: "frame" | "object"; ox: number; oy: number }[];
     startX: number;
     startY: number;
-    ox: number;
-    oy: number;
   } | null>(null);
+
+  const isSel = (id: string) => selection.includes(id);
+  const toggleSel = (id: string) =>
+    setSelection((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]));
+  // Latest selection for keyboard handlers (which capture an empty-deps closure).
+  const selectionRef = useRef<string[]>(selection);
+  useEffect(() => {
+    selectionRef.current = selection;
+  }, [selection]);
 
   // Fit the first frame into view on mount.
   useEffect(() => {
@@ -2250,7 +2526,8 @@ function Composer({
       const mx = e.clientX - r.left;
       const my = e.clientY - r.top;
       setView((v) => {
-        const factor = e.deltaY < 0 ? 1.1 : 1 / 1.1;
+        // Gentler than before (1.06 vs 1.1) so zoom is slower and more precise.
+        const factor = e.deltaY < 0 ? 1.06 : 1 / 1.06;
         const nz = Math.min(3, Math.max(0.2, v.zoom * factor));
         return { zoom: nz, x: mx - (mx - v.x) * (nz / v.zoom), y: my - (my - v.y) * (nz / v.zoom) };
       });
@@ -2259,12 +2536,182 @@ function Composer({
     return () => el.removeEventListener("wheel", onWheel);
   }, []);
 
+  // Keyboard: Escape cancels/deselects, Space enables panning, Delete removes selection.
+  useEffect(() => {
+    const typing = (t: EventTarget | null) => {
+      const el = t as HTMLElement | null;
+      return el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA");
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setArmed(null);
+        setPlacePrompt(null);
+        setContextMenu(null);
+        setSelection([]);
+      }
+      if (e.code === "Space" && !typing(e.target)) {
+        spaceRef.current = true;
+      }
+      if ((e.key === "Delete" || e.key === "Backspace") && !typing(e.target)) {
+        setFrames((fs) => fs.filter((f) => !selectionRef.current.includes(f.id)));
+        setObjects((os) => os.filter((o) => !selectionRef.current.includes(o.id)));
+        setSelection([]);
+      }
+    };
+    const onUp = (e: KeyboardEvent) => {
+      if (e.code === "Space") spaceRef.current = false;
+    };
+    window.addEventListener("keydown", onKey);
+    window.addEventListener("keyup", onUp);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      window.removeEventListener("keyup", onUp);
+    };
+  }, []);
+
+  // ----- Placement helpers (behavior per asset-behavior-matrix-2026.md) -----
+  const toWorld = (clientX: number, clientY: number) => {
+    const r = boardRef.current!.getBoundingClientRect();
+    return {
+      wx: (clientX - r.left - view.x) / view.zoom,
+      wy: (clientY - r.top - view.y) / view.zoom,
+    };
+  };
+  const hitFrame = (wx: number, wy: number) => {
+    for (let i = frames.length - 1; i >= 0; i--) {
+      const f = frames[i];
+      const dw = f.w * DISPLAY_SCALE;
+      const dh = f.h * DISPLAY_SCALE;
+      if (wx >= f.x && wx <= f.x + dw && wy >= f.y && wy <= f.y + dh) return f;
+    }
+    return null;
+  };
+  const objSize = (type: string) => {
+    if (type === "Icons" || type === "Stickers") return { w: 72, h: 72 };
+    if (type === "Logo") return { w: 130, h: 60 };
+    if (OVERLAY_TYPES.has(type)) return { w: 130, h: 130 };
+    return { w: 200, h: 200 };
+  };
+  const addObject = (image: string, type: string, cx: number, cy: number, overlay: boolean) => {
+    const { w, h } = objSize(type);
+    const id = "o" + Date.now() + Math.random().toString(36).slice(2, 6);
+    setObjects((os) => [...os, { id, x: cx - w / 2, y: cy - h / 2, w, h, image, overlay }]);
+    setSelection([id]);
+  };
+  const setFrameContent = (frameId: string, image: string, fit: "fill" | "fit") =>
+    setFrames((fs) => fs.map((f) => (f.id === frameId ? { ...f, content: { image, fit } } : f)));
+  const applyFramePlacement = (frameId: string, image: string, mode: "fill" | "fit" | "free") => {
+    if (mode === "free") {
+      const f = frames.find((x) => x.id === frameId);
+      addObject(
+        image,
+        "Photos",
+        f ? f.x + (f.w * DISPLAY_SCALE) / 2 : 0,
+        f ? f.y + (f.h * DISPLAY_SCALE) / 2 : 0,
+        false,
+      );
+    } else {
+      setFrameContent(frameId, image, mode);
+    }
+  };
+  const placeAssetAt = (image: string, type: string, clientX: number, clientY: number) => {
+    const { wx, wy } = toWorld(clientX, clientY);
+    const frame = hitFrame(wx, wy);
+    if (frame) {
+      if (FILL_TYPES.has(type)) {
+        setFrameContent(frame.id, image, "fill");
+        toast.success("Filled the frame");
+        return;
+      }
+      if (OVERLAY_TYPES.has(type)) {
+        addObject(
+          image,
+          type,
+          frame.x + (frame.w * DISPLAY_SCALE) / 2,
+          frame.y + (frame.h * DISPLAY_SCALE) / 2,
+          true,
+        );
+        return;
+      }
+      if (MODAL_TYPES.has(type)) {
+        const def = placeDefaults[type];
+        if (def) applyFramePlacement(frame.id, image, def);
+        else {
+          setRememberChoice(false);
+          setPlacePrompt({ image, type, frameId: frame.id });
+        }
+        return;
+      }
+      // unsupported on a frame → re-route to the board (never reject)
+    }
+    addObject(image, type, wx, wy, OVERLAY_TYPES.has(type));
+  };
+  const armAsset = (image: string, type: string) => {
+    setArmed({ image, type });
+    toast("Click the canvas to place. Esc to cancel.");
+  };
+  const commitZoom = () => {
+    setZoomEditing(false);
+    const pct = parseInt(zoomInput, 10);
+    if (!Number.isFinite(pct)) return;
+    const nz = Math.min(3, Math.max(0.2, pct / 100));
+    const el = boardRef.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    const mx = r.width / 2;
+    const my = r.height / 2;
+    setView((v) => ({
+      zoom: nz,
+      x: mx - (mx - v.x) * (nz / v.zoom),
+      y: my - (my - v.y) * (nz / v.zoom),
+    }));
+  };
+
+  // ----- Selection + group drag (Phase 2) -----
+  const startGroupDrag = (ids: string[], e: React.PointerEvent) => {
+    const items = ids
+      .filter((id) => !lockedIds.includes(id))
+      .map((id) => {
+        const f = frames.find((x) => x.id === id);
+        if (f) return { id, kind: "frame" as const, ox: f.x, oy: f.y };
+        const o = objects.find((x) => x.id === id)!;
+        return { id, kind: "object" as const, ox: o.x, oy: o.y };
+      });
+    if (!items.length) return;
+    groupDragRef.current = { items, startX: e.clientX, startY: e.clientY };
+    boardRef.current?.setPointerCapture(e.pointerId);
+  };
+  // Pointer-down on any frame/object: resolve selection, then start a (group) drag.
+  const onItemPointerDown = (id: string, e: React.PointerEvent) => {
+    if (placing || armed) return; // board handles placement clicks
+    e.stopPropagation();
+    setContextMenu(null);
+    setOpenPlatform(null);
+    if (e.shiftKey) {
+      toggleSel(id);
+      return; // shift-click toggles membership, no drag
+    }
+    const sel = selection.includes(id) ? selection : [id];
+    if (!selection.includes(id)) setSelection([id]);
+    startGroupDrag(sel, e);
+  };
+
   const boardPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     const el = boardRef.current;
     if (!el) return;
+    if (contextMenu) {
+      setContextMenu(null);
+      return;
+    }
     // Clicking outside an open size dropdown just closes it; edit mode stays on.
     if (openPlatform) {
       setOpenPlatform(null);
+      return;
+    }
+    // Click-to-place: drop the armed asset where the user clicked.
+    if (armed) {
+      placeAssetAt(armed.image, armed.type, e.clientX, e.clientY);
+      setArmed(null);
       return;
     }
     const r = el.getBoundingClientRect();
@@ -2287,39 +2734,67 @@ function Composer({
           headline: "Your headline goes here",
         },
       ]);
-      setSelectedFrameId(id);
+      setSelection([id]);
       setPlacing(false);
       setGhost(null);
       return;
     }
-    // Empty-space click: deselect and start panning.
-    setSelectedFrameId(null);
-    panRef.current = { startX: e.clientX, startY: e.clientY, ox: view.x, oy: view.y };
+    // Hold Space to pan; otherwise an empty-space drag draws a marquee selection.
+    if (spaceRef.current) {
+      setPanning(true);
+      panRef.current = { startX: e.clientX, startY: e.clientY, ox: view.x, oy: view.y };
+      el.setPointerCapture(e.pointerId);
+      return;
+    }
+    const sx = e.clientX - r.left;
+    const sy = e.clientY - r.top;
+    const base = e.shiftKey ? [...selection] : [];
+    if (!e.shiftKey) setSelection([]);
+    marqueeRef.current = { x0: sx, y0: sy, base };
+    setMarquee({ x0: sx, y0: sy, x1: sx, y1: sy });
     el.setPointerCapture(e.pointerId);
-  };
-  // Begin dragging a frame (pointer is captured on the board so fast drags don't escape).
-  const onFrameDragStart = (frame: BoardFrameData, e: React.PointerEvent) => {
-    frameDragRef.current = {
-      id: frame.id,
-      startX: e.clientX,
-      startY: e.clientY,
-      ox: frame.x,
-      oy: frame.y,
-    };
-    boardRef.current?.setPointerCapture(e.pointerId);
   };
   const boardPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
     const el = boardRef.current;
     if (!el) return;
     const r = el.getBoundingClientRect();
     if (placing) setGhost({ x: e.clientX - r.left, y: e.clientY - r.top });
-    const fd = frameDragRef.current;
-    if (fd) {
-      const dx = (e.clientX - fd.startX) / view.zoom;
-      const dy = (e.clientY - fd.startY) / view.zoom;
+    const gd = groupDragRef.current;
+    if (gd) {
+      const dx = (e.clientX - gd.startX) / view.zoom;
+      const dy = (e.clientY - gd.startY) / view.zoom;
+      const m = new Map(gd.items.map((it) => [it.id, it]));
       setFrames((fs) =>
-        fs.map((f) => (f.id === fd.id ? { ...f, x: fd.ox + dx, y: fd.oy + dy } : f)),
+        fs.map((f) =>
+          m.has(f.id) ? { ...f, x: m.get(f.id)!.ox + dx, y: m.get(f.id)!.oy + dy } : f,
+        ),
       );
+      setObjects((os) =>
+        os.map((o) =>
+          m.has(o.id) ? { ...o, x: m.get(o.id)!.ox + dx, y: m.get(o.id)!.oy + dy } : o,
+        ),
+      );
+      return;
+    }
+    const mq = marqueeRef.current;
+    if (mq) {
+      const x1 = e.clientX - r.left;
+      const y1 = e.clientY - r.top;
+      setMarquee({ x0: mq.x0, y0: mq.y0, x1, y1 });
+      const wx0 = (Math.min(mq.x0, x1) - view.x) / view.zoom;
+      const wy0 = (Math.min(mq.y0, y1) - view.y) / view.zoom;
+      const wx1 = (Math.max(mq.x0, x1) - view.x) / view.zoom;
+      const wy1 = (Math.max(mq.y0, y1) - view.y) / view.zoom;
+      const hits: string[] = [];
+      frames.forEach((f) => {
+        const dw = f.w * DISPLAY_SCALE;
+        const dh = f.h * DISPLAY_SCALE;
+        if (f.x < wx1 && f.x + dw > wx0 && f.y < wy1 && f.y + dh > wy0) hits.push(f.id);
+      });
+      objects.forEach((o) => {
+        if (o.x < wx1 && o.x + o.w > wx0 && o.y < wy1 && o.y + o.h > wy0) hits.push(o.id);
+      });
+      setSelection([...new Set([...mq.base, ...hits])]);
       return;
     }
     const p = panRef.current;
@@ -2331,8 +2806,11 @@ function Composer({
       }));
   };
   const boardPointerUp = () => {
-    frameDragRef.current = null;
+    groupDragRef.current = null;
     panRef.current = null;
+    marqueeRef.current = null;
+    setMarquee(null);
+    setPanning(false);
   };
   // ----- "Select to Send" panel -----
   const [sendPlatforms, setSendPlatforms] = useState<string[]>(DEFAULT_SEND_PLATFORMS);
@@ -2340,6 +2818,105 @@ function Composer({
   const [editOpen, setEditOpen] = useState(false);
   const [checkedFrames, setCheckedFrames] = useState<string[]>([]);
   const [uploadedVideo, setUploadedVideo] = useState<string | null>(null);
+
+  // ----- Context menu (Phase 2) — actions operate on the current selection -----
+  const uid = (p: string) => p + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+  const openContextMenu = (e: React.MouseEvent) => {
+    e.preventDefault();
+    const el = boardRef.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    const { wx, wy } = toWorld(e.clientX, e.clientY);
+    const frame = hitFrame(wx, wy);
+    const obj = frame
+      ? null
+      : [...objects]
+          .reverse()
+          .find((o) => wx >= o.x && wx <= o.x + o.w && wy >= o.y && wy <= o.y + o.h);
+    const hitId = frame?.id ?? obj?.id ?? null;
+    if (hitId && !selection.includes(hitId)) setSelection([hitId]);
+    if (!hitId && selection.length === 0) return;
+    setContextMenu({ x: e.clientX - r.left, y: e.clientY - r.top });
+  };
+  const selectedFrameIds = () => selection.filter((id) => frames.some((f) => f.id === id));
+  const cmDelete = () => {
+    setFrames((fs) => fs.filter((f) => !selection.includes(f.id)));
+    setObjects((os) => os.filter((o) => !selection.includes(o.id)));
+    setSelection([]);
+    setContextMenu(null);
+  };
+  const cmCopy = () => {
+    setClipboard({
+      frames: frames.filter((f) => selection.includes(f.id)),
+      objects: objects.filter((o) => selection.includes(o.id)),
+    });
+    setContextMenu(null);
+  };
+  const cmDuplicate = () => {
+    const nf = frames
+      .filter((f) => selection.includes(f.id))
+      .map((f) => ({ ...f, id: uid("f"), x: f.x + 24, y: f.y + 24 }));
+    const no = objects
+      .filter((o) => selection.includes(o.id))
+      .map((o) => ({ ...o, id: uid("o"), x: o.x + 24, y: o.y + 24 }));
+    setFrames((fs) => [...fs, ...nf]);
+    setObjects((os) => [...os, ...no]);
+    setSelection([...nf.map((f) => f.id), ...no.map((o) => o.id)]);
+    setContextMenu(null);
+  };
+  const cmPaste = () => {
+    if (!clipboard) return;
+    const nf = clipboard.frames.map((f) => ({ ...f, id: uid("f"), x: f.x + 24, y: f.y + 24 }));
+    const no = clipboard.objects.map((o) => ({ ...o, id: uid("o"), x: o.x + 24, y: o.y + 24 }));
+    setFrames((fs) => [...fs, ...nf]);
+    setObjects((os) => [...os, ...no]);
+    setSelection([...nf.map((f) => f.id), ...no.map((o) => o.id)]);
+    setContextMenu(null);
+  };
+  const cmCut = () => {
+    cmCopy();
+    cmDelete();
+  };
+  const cmForward = () => {
+    setFrames((fs) => [
+      ...fs.filter((f) => !selection.includes(f.id)),
+      ...fs.filter((f) => selection.includes(f.id)),
+    ]);
+    setObjects((os) => [
+      ...os.filter((o) => !selection.includes(o.id)),
+      ...os.filter((o) => selection.includes(o.id)),
+    ]);
+    setContextMenu(null);
+  };
+  const cmBackward = () => {
+    setFrames((fs) => [
+      ...fs.filter((f) => selection.includes(f.id)),
+      ...fs.filter((f) => !selection.includes(f.id)),
+    ]);
+    setObjects((os) => [
+      ...os.filter((o) => selection.includes(o.id)),
+      ...os.filter((o) => !selection.includes(o.id)),
+    ]);
+    setContextMenu(null);
+  };
+  const cmLock = () => {
+    setLockedIds((l) => [...new Set([...l, ...selection])]);
+    setContextMenu(null);
+  };
+  const cmUnlock = () => {
+    setLockedIds((l) => l.filter((id) => !selection.includes(id)));
+    setContextMenu(null);
+  };
+  const cmSendToPost = () => {
+    const fIds = selectedFrameIds();
+    setContextMenu(null);
+    if (!fIds.length) {
+      toast.error("Select at least one frame to send");
+      return;
+    }
+    setCheckedFrames((c) => [...new Set([...c, ...fIds])]);
+    toast.success(`${fIds.length} frame${fIds.length > 1 ? "s" : ""} added to Select to Send`);
+  };
 
   // Ideas card (collapsible AI Idea Engine)
   const [ideasOpen, setIdeasOpen] = useState(false);
@@ -2351,6 +2928,8 @@ function Composer({
 
   // Asset Library filter
   const [assetFilter, setAssetFilter] = useState("All");
+  // When set, the left sidebar shows the category explorer instead of the tile grid.
+  const [openCategory, setOpenCategory] = useState<string | null>(null);
   const visibleTiles =
     assetFilter === "All" ? ASSET_TILES : ASSET_TILES.filter((t) => t.cats.includes(assetFilter));
 
@@ -2371,11 +2950,11 @@ function Composer({
     toast.success(`${idea.day} caption added to your post`);
   };
   const composerShellRef = useRef<HTMLDivElement>(null);
-  const [composerColumns, setComposerColumns] = useState({ left: 26, right: 26 });
+  const [composerColumns, setComposerColumns] = useState({ left: 21, right: 22 });
   const centerColumn = 100 - composerColumns.left - composerColumns.right;
   const clampColumn = (value: number, min: number, max: number) =>
     Math.min(Math.max(value, min), max);
-  const resetComposerColumns = () => setComposerColumns({ left: 26, right: 26 });
+  const resetComposerColumns = () => setComposerColumns({ left: 21, right: 22 });
 
   const startColumnResize = (
     divider: "left" | "right",
@@ -2488,176 +3067,188 @@ function Composer({
     >
       {/* LEFT */}
       <div className="relative flex h-auto flex-col overflow-y-auto bg-card p-7 lg:h-full">
-        <div className="flex items-center justify-between">
-          <h3 className="text-base font-bold tracking-tight text-foreground">AI Idea Engine</h3>
-          <button
-            onClick={onExplore}
-            className="inline-flex items-center gap-1 text-sm font-semibold text-primary transition hover:text-primary/80"
-          >
-            Explore All <ArrowRight className="h-3.5 w-3.5" />
-          </button>
-        </div>
-
-        <section className="mt-5 rounded-[20px] bg-card p-6 shadow-[0_2px_8px_rgba(26,24,35,0.16)]">
-          <button
-            type="button"
-            onClick={() => setIdeasOpen((o) => !o)}
-            aria-expanded={ideasOpen}
-            className="flex w-full items-center justify-between"
-          >
-            <h4 className="text-base font-bold text-foreground">Ideas</h4>
-            <ChevronDown
-              className={`h-4 w-4 text-primary transition-transform ${ideasOpen ? "rotate-180" : ""}`}
-            />
-          </button>
-
-          {ideasOpen && (
-            <div className="mt-5 space-y-4">
-              <div>
-                <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  Campaign Goal
-                </label>
-                <select
-                  value={campaignGoal}
-                  onChange={(e) => setCampaignGoal(e.target.value)}
-                  className="mt-2 w-full rounded-xl border border-border bg-secondary/40 px-3 py-2.5 text-sm font-semibold text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/30"
-                >
-                  {CAMPAIGN_GOALS.map((g) => (
-                    <option key={g} value={g}>
-                      {g}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  Brief
-                </label>
-                <textarea
-                  value={brief}
-                  onChange={(e) => setBrief(e.target.value)}
-                  placeholder="Describe your idea or just push generate ..."
-                  className="mt-2 min-h-[110px] w-full resize-none rounded-xl border border-border bg-secondary/40 p-3 text-sm text-foreground outline-none placeholder:text-muted-foreground/70 focus:border-primary focus:ring-2 focus:ring-primary/30"
-                />
-              </div>
+        {openCategory ? (
+          <AssetExplorer
+            category={openCategory}
+            onBack={() => setOpenCategory(null)}
+            onPick={(image, type) => armAsset(image, type)}
+          />
+        ) : (
+          <>
+            <div className="flex items-center justify-between">
+              <h3 className="text-base font-bold tracking-tight text-foreground">AI Idea Engine</h3>
+              <button
+                onClick={onExplore}
+                className="inline-flex items-center gap-1 text-sm font-semibold text-primary transition hover:text-primary/80"
+              >
+                Explore All <ArrowRight className="h-3.5 w-3.5" />
+              </button>
             </div>
-          )}
 
-          <button
-            onClick={generateIdeas}
-            disabled={generating}
-            className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-5 py-3 text-sm font-bold text-white shadow-sm transition hover:brightness-110 disabled:opacity-70"
-          >
-            {generating ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin" /> Generating…
-              </>
-            ) : (
-              <>
-                <Sparkles className="h-4 w-4" /> Generate
-              </>
-            )}
-          </button>
+            <section className="mt-5 rounded-[20px] bg-card p-6 shadow-[0_2px_8px_rgba(26,24,35,0.16)]">
+              <button
+                type="button"
+                onClick={() => setIdeasOpen((o) => !o)}
+                aria-expanded={ideasOpen}
+                className="flex w-full items-center justify-between"
+              >
+                <h4 className="text-base font-bold text-foreground">Ideas</h4>
+                <ChevronDown
+                  className={`h-4 w-4 text-primary transition-transform ${ideasOpen ? "rotate-180" : ""}`}
+                />
+              </button>
 
-          {ideasOpen && ideas && (
-            <div className="mt-5 space-y-2 border-t border-border pt-4">
-              <div className="text-[11px] font-semibold uppercase tracking-widest text-primary">
-                Generated Ideas
-              </div>
-              {ideas.map((idea) => (
-                <button
-                  key={idea.day}
-                  onClick={() => setPendingIdea(idea)}
-                  className="group flex w-full items-center gap-3 rounded-xl border border-border bg-card p-2.5 text-left transition hover:border-primary hover:bg-muted"
-                >
-                  <img
-                    src={idea.thumb}
-                    alt=""
-                    className="h-11 w-11 shrink-0 rounded-lg object-cover"
-                  />
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-1.5">
-                      <span
-                        className={`grid h-4 w-4 shrink-0 place-items-center rounded ${idea.iconBg}`}
-                      >
-                        <idea.icon className="h-2.5 w-2.5 text-white" />
-                      </span>
-                      <span className="truncate text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                        {idea.day} · {idea.platform}
-                      </span>
-                    </div>
-                    <p className="mt-1 line-clamp-2 text-xs text-foreground/90">{idea.teaser}</p>
+              {ideasOpen && (
+                <div className="mt-5 space-y-4">
+                  <div>
+                    <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                      Campaign Goal
+                    </label>
+                    <select
+                      value={campaignGoal}
+                      onChange={(e) => setCampaignGoal(e.target.value)}
+                      className="mt-2 w-full rounded-xl border border-border bg-secondary/40 px-3 py-2.5 text-sm font-semibold text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/30"
+                    >
+                      {CAMPAIGN_GOALS.map((g) => (
+                        <option key={g} value={g}>
+                          {g}
+                        </option>
+                      ))}
+                    </select>
                   </div>
+                  <div>
+                    <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                      Brief
+                    </label>
+                    <textarea
+                      value={brief}
+                      onChange={(e) => setBrief(e.target.value)}
+                      placeholder="Describe your idea or just push generate ..."
+                      className="mt-2 min-h-[110px] w-full resize-none rounded-xl border border-border bg-secondary/40 p-3 text-sm text-foreground outline-none placeholder:text-muted-foreground/70 focus:border-primary focus:ring-2 focus:ring-primary/30"
+                    />
+                  </div>
+                </div>
+              )}
+
+              <button
+                onClick={generateIdeas}
+                disabled={generating}
+                className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-5 py-3 text-sm font-bold text-white shadow-sm transition hover:brightness-110 disabled:opacity-70"
+              >
+                {generating ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" /> Generating…
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="h-4 w-4" /> Generate
+                  </>
+                )}
+              </button>
+
+              {ideasOpen && ideas && (
+                <div className="mt-5 space-y-2 border-t border-border pt-4">
+                  <div className="text-[11px] font-semibold uppercase tracking-widest text-primary">
+                    Generated Ideas
+                  </div>
+                  {ideas.map((idea) => (
+                    <button
+                      key={idea.day}
+                      onClick={() => setPendingIdea(idea)}
+                      className="group flex w-full items-center gap-3 rounded-xl border border-border bg-card p-2.5 text-left transition hover:border-primary hover:bg-muted"
+                    >
+                      <img
+                        src={idea.thumb}
+                        alt=""
+                        className="h-11 w-11 shrink-0 rounded-lg object-cover"
+                      />
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5">
+                          <span
+                            className={`grid h-4 w-4 shrink-0 place-items-center rounded ${idea.iconBg}`}
+                          >
+                            <idea.icon className="h-2.5 w-2.5 text-white" />
+                          </span>
+                          <span className="truncate text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                            {idea.day} · {idea.platform}
+                          </span>
+                        </div>
+                        <p className="mt-1 line-clamp-2 text-xs text-foreground/90">
+                          {idea.teaser}
+                        </p>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </section>
+
+            <h3 className="mt-8 text-base font-bold tracking-tight text-foreground">Source</h3>
+            <label className="mt-4 flex min-h-36 cursor-pointer flex-col items-center justify-center gap-2 rounded-[18px] border-2 border-dashed border-border bg-card p-6 text-center transition hover:border-primary hover:bg-card">
+              <Upload className="h-8 w-8 text-primary" />
+              <span className="text-sm font-bold text-foreground">
+                {uploadedVideo ?? "Drop long-form source video"}
+              </span>
+              <span className="text-sm font-bold text-muted-foreground">.mp4, .mov up to 2GB</span>
+              <input type="file" accept="video/*" className="hidden" onChange={onUpload} />
+            </label>
+
+            <div className="mt-8 flex items-center justify-between">
+              <h3 className="text-base font-bold tracking-tight text-foreground">Asset Library</h3>
+              <button
+                onClick={onEditLibrary}
+                className="text-sm font-semibold text-primary transition hover:text-primary/80"
+              >
+                Edit Library
+              </button>
+            </div>
+
+            {/* Horizontally-scrollable filter pills — shrink-0 keeps them from being
+            collapsed by the sidebar's flex column (overflow-x sets min-height:0). */}
+            <div className="mt-4 flex shrink-0 gap-2 overflow-x-auto whitespace-nowrap pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              {ASSET_TILE_FILTERS.map((filter) => {
+                const active = assetFilter === filter;
+                return (
+                  <button
+                    key={filter}
+                    onClick={() => setAssetFilter(filter)}
+                    className={`h-7 shrink-0 rounded-full px-3.5 text-xs font-bold transition ${
+                      active
+                        ? "bg-primary text-white shadow-sm shadow-primary/30"
+                        : "bg-secondary text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    {filter}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Tiles flow directly in the sidebar — the whole left bar is the single
+            scroll container, so rows cut off at the bottom cue scrolling the bar.
+            shrink-0 keeps rows at full height instead of being squished by the flex column. */}
+            <div className="mt-5 grid shrink-0 grid-cols-3 gap-x-5 gap-y-6">
+              {visibleTiles.map((asset) => (
+                <button
+                  key={asset.label}
+                  onClick={() => setOpenCategory(asset.label)}
+                  className="group flex min-w-0 flex-col items-center gap-2 text-center"
+                >
+                  <span
+                    className={`grid h-[54px] w-[54px] place-items-center rounded-xl bg-gradient-to-br ${asset.bg} text-white shadow-[3px_4px_0_rgba(255,255,255,0.75)_inset,0_5px_12px_rgba(18,20,30,0.2)] transition group-hover:-translate-y-0.5`}
+                  >
+                    <asset.icon className="h-6 w-6" />
+                  </span>
+                  <span className="text-xs text-foreground">{asset.label}</span>
                 </button>
               ))}
             </div>
-          )}
-        </section>
-
-        <h3 className="mt-8 text-base font-bold tracking-tight text-foreground">Source</h3>
-        <label className="mt-4 flex min-h-36 cursor-pointer flex-col items-center justify-center gap-2 rounded-[18px] border-2 border-dashed border-border bg-card p-6 text-center transition hover:border-primary hover:bg-card">
-          <Upload className="h-8 w-8 text-primary" />
-          <span className="text-sm font-bold text-foreground">
-            {uploadedVideo ?? "Drop long-form source video"}
-          </span>
-          <span className="text-sm font-bold text-muted-foreground">.mp4, .mov up to 2GB</span>
-          <input type="file" accept="video/*" className="hidden" onChange={onUpload} />
-        </label>
-
-        <div className="mt-8 flex items-center justify-between">
-          <h3 className="text-base font-bold tracking-tight text-foreground">Asset Library</h3>
-          <button
-            onClick={onEditLibrary}
-            className="text-sm font-semibold text-primary transition hover:text-primary/80"
-          >
-            Edit Library
-          </button>
-        </div>
-
-        {/* Horizontally-scrollable filter pills — shrink-0 keeps them from being
-            collapsed by the sidebar's flex column (overflow-x sets min-height:0). */}
-        <div className="mt-4 flex shrink-0 gap-2 overflow-x-auto whitespace-nowrap pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          {ASSET_TILE_FILTERS.map((filter) => {
-            const active = assetFilter === filter;
-            return (
-              <button
-                key={filter}
-                onClick={() => setAssetFilter(filter)}
-                className={`h-7 shrink-0 rounded-full px-3.5 text-xs font-bold transition ${
-                  active
-                    ? "bg-primary text-white shadow-sm shadow-primary/30"
-                    : "bg-secondary text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                {filter}
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Tiles flow directly in the sidebar — the whole left bar is the single
-            scroll container, so rows cut off at the bottom cue scrolling the bar.
-            shrink-0 keeps rows at full height instead of being squished by the flex column. */}
-        <div className="mt-5 grid shrink-0 grid-cols-3 gap-x-5 gap-y-6">
-          {visibleTiles.map((asset) => (
-            <button
-              key={asset.label}
-              onClick={() => toast(`${asset.label} assets`)}
-              className="group flex min-w-0 flex-col items-center gap-2 text-center"
-            >
-              <span
-                className={`grid h-[54px] w-[54px] place-items-center rounded-xl bg-gradient-to-br ${asset.bg} text-white shadow-[3px_4px_0_rgba(255,255,255,0.75)_inset,0_5px_12px_rgba(18,20,30,0.2)] transition group-hover:-translate-y-0.5`}
-              >
-                <asset.icon className="h-6 w-6" />
-              </span>
-              <span className="text-xs text-foreground">{asset.label}</span>
-            </button>
-          ))}
-        </div>
-        {visibleTiles.length === 0 && (
-          <p className="py-6 text-center text-xs text-muted-foreground">
-            No assets in this filter.
-          </p>
+            {visibleTiles.length === 0 && (
+              <p className="py-6 text-center text-xs text-muted-foreground">
+                No assets in this filter.
+              </p>
+            )}
+          </>
         )}
       </div>
 
@@ -2675,32 +3266,77 @@ function Composer({
             onPointerDown={boardPointerDown}
             onPointerMove={boardPointerMove}
             onPointerUp={boardPointerUp}
+            onContextMenu={openContextMenu}
+            onDragOver={(e) => {
+              e.preventDefault();
+              e.dataTransfer.dropEffect = "copy";
+            }}
+            onDrop={(e) => {
+              e.preventDefault();
+              const img = e.dataTransfer.getData("text/omni-asset");
+              if (img) placeAssetAt(img, openCategory ?? "Photos", e.clientX, e.clientY);
+            }}
             className="relative min-h-[420px] flex-1 overflow-hidden rounded-2xl lg:min-h-0"
-            style={{ cursor: placing ? "crosshair" : "grab", touchAction: "none" }}
+            style={{
+              cursor: placing || armed ? "crosshair" : panning ? "grabbing" : "default",
+              touchAction: "none",
+            }}
           >
-            {/* World — pans and zooms; frames live in its coordinate space */}
+            {/* World — pans and zooms; frames and placed objects live in its space */}
             <div
               className="pointer-events-none absolute left-0 top-0 origin-top-left"
-              style={{ transform: `translate(${view.x}px, ${view.y}px) scale(${view.zoom})` }}
+              style={{
+                transform: `translate(${view.x}px, ${view.y}px) scale(${view.zoom})`,
+                transition: panning ? "none" : "transform 140ms ease-out",
+              }}
             >
               {frames.map((f) => (
                 <BoardFrame
                   key={f.id}
                   frame={f}
                   image={selectedAsset}
-                  selected={selectedFrameId === f.id}
-                  placing={placing}
-                  onSelect={() => {
-                    setSelectedFrameId(f.id);
-                    setOpenPlatform(null);
-                  }}
+                  selected={isSel(f.id)}
                   onHeadline={(h) =>
                     setFrames((fs) => fs.map((x) => (x.id === f.id ? { ...x, headline: h } : x)))
                   }
-                  onDragStart={(e) => onFrameDragStart(f, e)}
+                  onItemPointerDown={(e) => onItemPointerDown(f.id, e)}
                 />
               ))}
+
+              {/* Placed assets (free objects / overlays) */}
+              {objects.map((o) => (
+                <div
+                  key={o.id}
+                  className={`pointer-events-auto absolute cursor-move overflow-hidden rounded-md ${
+                    isSel(o.id) ? "ring-2 ring-blue-500" : ""
+                  } ${lockedIds.includes(o.id) ? "opacity-90" : ""}`}
+                  style={{ left: o.x, top: o.y, width: o.w, height: o.h }}
+                  onPointerDown={(e) => onItemPointerDown(o.id, e)}
+                >
+                  <img
+                    src={o.image}
+                    alt=""
+                    draggable={false}
+                    className={`h-full w-full ${o.overlay ? "object-contain" : "object-cover"}`}
+                  />
+                </div>
+              ))}
+
+              {/* Marquee selection box (rendered in screen space via the world's inverse) */}
             </div>
+
+            {/* Marquee selection rectangle (screen space) */}
+            {marquee && (
+              <div
+                className="pointer-events-none absolute rounded-sm border border-blue-500 bg-blue-500/10"
+                style={{
+                  left: Math.min(marquee.x0, marquee.x1),
+                  top: Math.min(marquee.y0, marquee.y1),
+                  width: Math.abs(marquee.x1 - marquee.x0),
+                  height: Math.abs(marquee.y1 - marquee.y0),
+                }}
+              />
+            )}
 
             {/* Ghost frame trailing the cursor while placing (CapCut-style + badge) */}
             {placing && ghost && (
@@ -2723,7 +3359,8 @@ function Composer({
                 Rendered in screen space so it stays a constant size (font/size don't
                 shrink on zoom); its position tracks the frame through pan/zoom/drag. */}
             {(() => {
-              const sf = frames.find((f) => f.id === selectedFrameId);
+              // Only show the per-frame toolbar when exactly one frame is selected.
+              const sf = selection.length === 1 ? frames.find((f) => f.id === selection[0]) : null;
               if (!sf) return null;
               const barX = view.x + (sf.x + (sf.w * DISPLAY_SCALE) / 2) * view.zoom;
               const barY = view.y + sf.y * view.zoom - 8;
@@ -2798,10 +3435,88 @@ function Composer({
               );
             })()}
 
-            {/* Zoom indicator */}
-            <div className="pointer-events-none absolute bottom-3 left-3 rounded-lg bg-card/90 px-2 py-1 text-xs font-semibold text-muted-foreground shadow">
-              {Math.round(view.zoom * 100)}%
+            {/* Zoom indicator — click to type an exact percentage */}
+            <div onPointerDown={(e) => e.stopPropagation()} className="absolute bottom-3 left-3">
+              {zoomEditing ? (
+                <div className="flex items-center rounded-lg bg-card px-2 py-1 text-xs font-semibold shadow ring-2 ring-primary/40">
+                  <input
+                    autoFocus
+                    value={zoomInput}
+                    onChange={(e) => setZoomInput(e.target.value.replace(/[^0-9]/g, ""))}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") commitZoom();
+                      if (e.key === "Escape") setZoomEditing(false);
+                    }}
+                    onBlur={commitZoom}
+                    className="w-9 bg-transparent text-right outline-none"
+                  />
+                  <span className="text-muted-foreground">%</span>
+                </div>
+              ) : (
+                <button
+                  onClick={() => {
+                    setZoomInput(String(Math.round(view.zoom * 100)));
+                    setZoomEditing(true);
+                  }}
+                  title="Click to set an exact zoom"
+                  className="rounded-lg bg-card/90 px-2 py-1 text-xs font-semibold text-muted-foreground shadow transition hover:text-foreground hover:ring-1 hover:ring-primary/40"
+                >
+                  {Math.round(view.zoom * 100)}%
+                </button>
+              )}
             </div>
+
+            {/* Right-click context menu (screen space) */}
+            {contextMenu && (
+              <div
+                onPointerDown={(e) => e.stopPropagation()}
+                onContextMenu={(e) => e.preventDefault()}
+                className="absolute z-40 w-44 rounded-xl border border-border bg-popover p-1 text-sm text-popover-foreground shadow-xl"
+                style={{
+                  left: Math.min(contextMenu.x, 9999),
+                  top: contextMenu.y,
+                  cursor: "default",
+                }}
+              >
+                {(
+                  [
+                    ["Cut", cmCut],
+                    ["Copy", cmCopy],
+                    ["Paste", cmPaste],
+                    ["Duplicate", cmDuplicate],
+                    ["Delete", cmDelete],
+                    ["divider"],
+                    ["Group", () => toast("Group — coming soon")],
+                    ["Ungroup", () => toast("Ungroup — coming soon")],
+                    ["Lock", cmLock],
+                    ["Unlock", cmUnlock],
+                    ["divider"],
+                    ["Bring Forward", cmForward],
+                    ["Send Backward", cmBackward],
+                    ["Align", () => toast("Align — coming soon")],
+                    ["Distribute", () => toast("Distribute — coming soon")],
+                    ["Rename", () => toast("Rename — coming soon")],
+                    ["divider"],
+                    ["Send to Post", cmSendToPost],
+                  ] as [string, (() => void)?][]
+                ).map(([label, action], i) =>
+                  label === "divider" ? (
+                    <div key={i} className="my-1 h-px bg-border" />
+                  ) : (
+                    <button
+                      key={label}
+                      onClick={action}
+                      disabled={label === "Paste" && !clipboard}
+                      className={`flex w-full items-center justify-between rounded-lg px-2.5 py-1.5 text-left transition hover:bg-muted disabled:opacity-40 ${
+                        label === "Send to Post" ? "font-semibold text-primary" : ""
+                      } ${label === "Delete" ? "text-rose-600 dark:text-rose-300" : ""}`}
+                    >
+                      {label}
+                    </button>
+                  ),
+                )}
+              </div>
+            )}
 
             {/* Lower editing toolbar with collapsible dock */}
             <div
@@ -2824,7 +3539,7 @@ function Composer({
                       t.label === "Frame"
                         ? () => {
                             setPlacing((p) => !p);
-                            setSelectedFrameId(null);
+                            setSelection([]);
                           }
                         : undefined
                     }
@@ -3083,6 +3798,59 @@ function Composer({
         </div>
       </div>
 
+      {/* "Place Asset in Frame" modal (photo/video/animation/pdf onto a frame) */}
+      {placePrompt && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm"
+          onClick={() => setPlacePrompt(null)}
+        >
+          <div
+            className="w-full max-w-sm rounded-2xl border border-border bg-card p-6 text-foreground shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-lg font-bold">Place Asset in Frame</h3>
+            <p className="mt-1 text-sm text-muted-foreground">
+              How would you like this content placed?
+            </p>
+            <div className="mt-4 space-y-2">
+              {(
+                [
+                  ["fill", "Fill Frame", "Cover the frame; crop overflow."],
+                  ["fit", "Fit Entire Asset", "Show the whole asset; letterbox."],
+                  ["free", "Place Freely", "Drop on the frame; move it yourself."],
+                ] as const
+              ).map(([mode, label, desc]) => (
+                <button
+                  key={mode}
+                  onClick={() => {
+                    applyFramePlacement(placePrompt.frameId, placePrompt.image, mode);
+                    if (rememberChoice)
+                      setPlaceDefaults((d) => ({ ...d, [placePrompt.type]: mode }));
+                    setPlacePrompt(null);
+                  }}
+                  className="flex w-full items-center justify-between gap-3 rounded-xl border border-border bg-secondary/40 px-4 py-3 text-left transition hover:border-primary hover:bg-muted"
+                >
+                  <span>
+                    <span className="block text-sm font-bold">{label}</span>
+                    <span className="block text-xs text-muted-foreground">{desc}</span>
+                  </span>
+                  <ArrowRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+                </button>
+              ))}
+            </div>
+            <label className="mt-4 flex cursor-pointer items-center gap-2 text-xs text-muted-foreground">
+              <input
+                type="checkbox"
+                checked={rememberChoice}
+                onChange={(e) => setRememberChoice(e.target.checked)}
+                className="accent-[color:var(--primary)]"
+              />
+              Always do this for {placePrompt.type} this session
+            </label>
+          </div>
+        </div>
+      )}
+
       {/* "Use this idea?" confirmation modal */}
       {pendingIdea && (
         <div
@@ -3151,8 +3919,9 @@ function ComposerResizeHandle({
       onDoubleClick={onReset}
       className="group relative z-20 hidden cursor-col-resize touch-none items-center justify-center bg-[#9258ff] outline-none transition hover:bg-[#7d42ee] focus-visible:ring-2 focus-visible:ring-[#9258ff]/50 lg:flex"
     >
-      <span className="absolute left-1/2 top-1/2 grid h-12 w-8 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full bg-white text-black shadow-md transition group-hover:scale-105 group-active:scale-95">
-        <SlidersHorizontal className="h-4 w-4 rotate-90" />
+      <span className="absolute left-1/2 top-1/2 flex h-12 w-10 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-white text-black shadow-md transition group-hover:scale-105 group-active:scale-95">
+        <ChevronLeft className="h-4 w-4" strokeWidth={2.5} />
+        <ChevronRight className="-ml-0.5 h-4 w-4" strokeWidth={2.5} />
       </span>
     </button>
   );
