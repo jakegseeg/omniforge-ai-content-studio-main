@@ -377,7 +377,55 @@ const EX_POOL = [
 const EXPLORER_FIXED = ["Recently Used", "Trending", "Recommendations", "Lead", "Hook", "Effects"];
 const EXPLORER_TOPICS = ["People", "Food", "Aerial Shots", "Sky", "Nature", "Travel", "Cinematic"];
 
-function ExplorerRow({ title, video, pool }: { title: string; video: boolean; pool: string[] }) {
+// Metadata shown beneath each thumbnail, keyed by tile label
+// (from asset-library-dimensions-2026.md; cycled across cards in a row).
+const ASSET_META: Record<string, string[]> = {
+  Photos: ["1080 × 1080", "1080 × 1350", "1080 × 1920", "1920 × 1080"],
+  Videos: ["1080 × 1920", "1920 × 1080", "1080 × 1080", "1080 × 1350"],
+  Graphics: ["Scalable Vector", "1000 × 1000", "1080 × 1080", "1920 × 1080"],
+  Shapes: ["256 × 256", "512 × 512", "1000 × 1000"],
+  Icons: ["24 × 24", "48 × 48", "128 × 128", "512 × 512"],
+  Stickers: ["512 × 512", "1024 × 1024"],
+  Logo: ["1000 × 400", "600 × 1000", "1000 × 1000", "SVG"],
+  Backgrounds: ["1920 × 1080", "1080 × 1920", "1080 × 1080"],
+  Gradients: ["1920 × 1080", "1080 × 1920", "1080 × 1080"],
+  Animations: ["Vector", "1080 × 1080", "1080 × 1920"],
+  Audio: ["3:12 · MP3 · 128 BPM", "2:05 · WAV", "1:48 · MP3"],
+  Charts: ["1200 × 800", "1920 × 1080", "1080 × 1080"],
+  Tables: ["1200 × 800 · 4×6", "1200 × 800"],
+  Forms: ["600 × 900 · 6 fields", "500 × 700"],
+  Sheets: ["1600 × 900"],
+  Frames: ["1080 × 1080", "1080 × 1920", "1920 × 1080"],
+  Grids: ["9 cells · 1080²", "1200 × 1200"],
+  Mockups: ["1080 × 1920", "1920 × 1200", "2560 × 1440"],
+  "3D": ["1000 × 1000 · GLTF"],
+  PDFs: ["600 × 800 · 20 Pages"],
+  Templates: ["1080 × 1080", "1080 × 1920"],
+  Text: ["Montserrat Bold", "Inter Regular"],
+  Uploads: ["Original size"],
+};
+
+// Drop behavior classes (source of truth: asset-behavior-matrix-2026.md).
+// Photo/Video/Animation/PDF onto a frame → Fill/Fit/Place-Freely modal.
+const MODAL_TYPES = new Set(["Photos", "Videos", "Animations", "PDFs"]);
+// Icons/Stickers/Logo/Graphics/3D/Shapes → drop centered at original size, no modal.
+const OVERLAY_TYPES = new Set(["Icons", "Stickers", "Logo", "Graphics", "3D", "Shapes"]);
+// Backgrounds/Gradients → auto-fill the frame, no modal.
+const FILL_TYPES = new Set(["Backgrounds", "Gradients"]);
+
+function ExplorerRow({
+  title,
+  video,
+  pool,
+  meta,
+  onPick,
+}: {
+  title: string;
+  video: boolean;
+  pool: string[];
+  meta: string[];
+  onPick: (img: string) => void;
+}) {
   return (
     <section className="mt-5">
       <div className="mb-2 flex items-center justify-between">
@@ -391,20 +439,35 @@ function ExplorerRow({ title, video, pool }: { title: string; video: boolean; po
       </div>
       <div className="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {pool.map((img, i) => (
-          <button
-            key={i}
-            onClick={() => toast("Added to canvas")}
-            className={`relative shrink-0 overflow-hidden rounded-lg border border-border transition hover:border-primary ${
-              video ? "h-28 w-[86px]" : "h-20 w-[104px]"
-            }`}
-          >
-            <img src={img} alt="" className="absolute inset-0 h-full w-full object-cover" />
-            {video && (
-              <span className="absolute bottom-1 left-1 rounded bg-black/70 px-1 py-0.5 text-[9px] font-semibold text-white">
-                {8 + i * 3}.0s
-              </span>
-            )}
-          </button>
+          <div key={i} className="shrink-0">
+            <button
+              draggable
+              onDragStart={(e) => {
+                e.dataTransfer.setData("text/omni-asset", img);
+                e.dataTransfer.effectAllowed = "copy";
+              }}
+              onClick={() => onPick(img)}
+              title="Click to place, or drag onto the canvas"
+              className={`relative block cursor-grab overflow-hidden rounded-lg border border-border transition hover:border-primary active:cursor-grabbing ${
+                video ? "h-28 w-[86px]" : "h-20 w-[104px]"
+              }`}
+            >
+              <img
+                src={img}
+                alt=""
+                draggable={false}
+                className="absolute inset-0 h-full w-full object-cover"
+              />
+              {video && (
+                <span className="absolute bottom-1 left-1 rounded bg-black/70 px-1 py-0.5 text-[9px] font-semibold text-white">
+                  {8 + i * 3}.0s
+                </span>
+              )}
+            </button>
+            <div className="mt-1 w-[104px] max-w-full truncate text-[9px] font-medium text-muted-foreground">
+              {meta[i % meta.length]}
+            </div>
+          </div>
         ))}
       </div>
     </section>
@@ -412,7 +475,15 @@ function ExplorerRow({ title, video, pool }: { title: string; video: boolean; po
 }
 
 // Replaces the whole left sidebar when an asset tile is opened.
-function AssetExplorer({ category, onBack }: { category: string; onBack: () => void }) {
+function AssetExplorer({
+  category,
+  onBack,
+  onPick,
+}: {
+  category: string;
+  onBack: () => void;
+  onPick: (image: string, type: string) => void;
+}) {
   const [q, setQ] = useState("");
   const video = category === "Videos" || category === "Animations";
   const rows = [...EXPLORER_FIXED, ...EXPLORER_TOPICS];
@@ -472,7 +543,14 @@ function AssetExplorer({ category, onBack }: { category: string; onBack: () => v
       </div>
 
       {visible.map((title, i) => (
-        <ExplorerRow key={title} title={title} video={video} pool={poolFor(i)} />
+        <ExplorerRow
+          key={title}
+          title={title}
+          video={video}
+          pool={poolFor(i)}
+          meta={ASSET_META[category] ?? ["1080 × 1080"]}
+          onPick={(img) => onPick(img, category)}
+        />
       ))}
       {visible.length === 0 && (
         <p className="mt-6 text-center text-xs text-muted-foreground">No matches for “{q}”.</p>
@@ -2221,6 +2299,19 @@ type BoardFrameData = {
   w: number; // real px width
   h: number; // real px height
   headline: string;
+  content?: { image: string; fit: "fill" | "fit" }; // asset placed into this frame
+};
+
+// A free asset placed on the board (photo dropped on empty space, or an
+// icon/sticker/logo overlay). World coordinates; not clipped to a frame.
+type BoardObject = {
+  id: string;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  image: string;
+  overlay: boolean; // overlays (icons/stickers/logos) use object-contain
 };
 
 // A frame sent from the Composer to the Calendar page's sidebar inventory.
@@ -2287,7 +2378,20 @@ function BoardFrame({
         style={{ width: dispW, height: dispH }}
       >
         <div className="absolute inset-0 overflow-hidden rounded-[16px] shadow-[0_14px_30px_rgba(0,0,0,0.2)]">
-          <img src={image} alt="" className="absolute inset-0 h-full w-full object-cover" />
+          {frame.content ? (
+            <>
+              <div className="absolute inset-0 bg-muted" />
+              <img
+                src={frame.content.image}
+                alt=""
+                className={`absolute inset-0 h-full w-full ${
+                  frame.content.fit === "fill" ? "object-cover" : "object-contain"
+                }`}
+              />
+            </>
+          ) : (
+            <img src={image} alt="" className="absolute inset-0 h-full w-full object-cover" />
+          )}
           <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-white/10" />
           <div className="absolute inset-x-4 bottom-[8%]">
             <textarea
@@ -2368,6 +2472,31 @@ function Composer({
     oy: number;
   } | null>(null);
 
+  // ----- Asset placement (Phase 1) -----
+  const [objects, setObjects] = useState<BoardObject[]>([]);
+  const [selectedObjectId, setSelectedObjectId] = useState<string | null>(null);
+  // Click-to-place: an asset is "armed" and waiting for a canvas click.
+  const [armed, setArmed] = useState<{ image: string; type: string } | null>(null);
+  // Fill/Fit/Place-Freely modal for media dropped on a frame.
+  const [placePrompt, setPlacePrompt] = useState<{
+    image: string;
+    type: string;
+    frameId: string;
+  } | null>(null);
+  const [rememberChoice, setRememberChoice] = useState(false);
+  const [placeDefaults, setPlaceDefaults] = useState<Record<string, "fill" | "fit" | "free">>({});
+  const [panning, setPanning] = useState(false);
+  // Editable zoom indicator.
+  const [zoomEditing, setZoomEditing] = useState(false);
+  const [zoomInput, setZoomInput] = useState("");
+  const objDragRef = useRef<{
+    id: string;
+    startX: number;
+    startY: number;
+    ox: number;
+    oy: number;
+  } | null>(null);
+
   // Fit the first frame into view on mount.
   useEffect(() => {
     const el = boardRef.current;
@@ -2392,7 +2521,8 @@ function Composer({
       const mx = e.clientX - r.left;
       const my = e.clientY - r.top;
       setView((v) => {
-        const factor = e.deltaY < 0 ? 1.1 : 1 / 1.1;
+        // Gentler than before (1.06 vs 1.1) so zoom is slower and more precise.
+        const factor = e.deltaY < 0 ? 1.06 : 1 / 1.06;
         const nz = Math.min(3, Math.max(0.2, v.zoom * factor));
         return { zoom: nz, x: mx - (mx - v.x) * (nz / v.zoom), y: my - (my - v.y) * (nz / v.zoom) };
       });
@@ -2401,12 +2531,129 @@ function Composer({
     return () => el.removeEventListener("wheel", onWheel);
   }, []);
 
+  // Escape cancels an armed asset or an open placement modal.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setArmed(null);
+        setPlacePrompt(null);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
+  // ----- Placement helpers (behavior per asset-behavior-matrix-2026.md) -----
+  const toWorld = (clientX: number, clientY: number) => {
+    const r = boardRef.current!.getBoundingClientRect();
+    return {
+      wx: (clientX - r.left - view.x) / view.zoom,
+      wy: (clientY - r.top - view.y) / view.zoom,
+    };
+  };
+  const hitFrame = (wx: number, wy: number) => {
+    for (let i = frames.length - 1; i >= 0; i--) {
+      const f = frames[i];
+      const dw = f.w * DISPLAY_SCALE;
+      const dh = f.h * DISPLAY_SCALE;
+      if (wx >= f.x && wx <= f.x + dw && wy >= f.y && wy <= f.y + dh) return f;
+    }
+    return null;
+  };
+  const objSize = (type: string) => {
+    if (type === "Icons" || type === "Stickers") return { w: 72, h: 72 };
+    if (type === "Logo") return { w: 130, h: 60 };
+    if (OVERLAY_TYPES.has(type)) return { w: 130, h: 130 };
+    return { w: 200, h: 200 };
+  };
+  const addObject = (image: string, type: string, cx: number, cy: number, overlay: boolean) => {
+    const { w, h } = objSize(type);
+    const id = "o" + Date.now() + Math.random().toString(36).slice(2, 6);
+    setObjects((os) => [...os, { id, x: cx - w / 2, y: cy - h / 2, w, h, image, overlay }]);
+    setSelectedObjectId(id);
+    setSelectedFrameId(null);
+  };
+  const setFrameContent = (frameId: string, image: string, fit: "fill" | "fit") =>
+    setFrames((fs) => fs.map((f) => (f.id === frameId ? { ...f, content: { image, fit } } : f)));
+  const applyFramePlacement = (frameId: string, image: string, mode: "fill" | "fit" | "free") => {
+    if (mode === "free") {
+      const f = frames.find((x) => x.id === frameId);
+      addObject(
+        image,
+        "Photos",
+        f ? f.x + (f.w * DISPLAY_SCALE) / 2 : 0,
+        f ? f.y + (f.h * DISPLAY_SCALE) / 2 : 0,
+        false,
+      );
+    } else {
+      setFrameContent(frameId, image, mode);
+    }
+  };
+  const placeAssetAt = (image: string, type: string, clientX: number, clientY: number) => {
+    const { wx, wy } = toWorld(clientX, clientY);
+    const frame = hitFrame(wx, wy);
+    if (frame) {
+      if (FILL_TYPES.has(type)) {
+        setFrameContent(frame.id, image, "fill");
+        toast.success("Filled the frame");
+        return;
+      }
+      if (OVERLAY_TYPES.has(type)) {
+        addObject(
+          image,
+          type,
+          frame.x + (frame.w * DISPLAY_SCALE) / 2,
+          frame.y + (frame.h * DISPLAY_SCALE) / 2,
+          true,
+        );
+        return;
+      }
+      if (MODAL_TYPES.has(type)) {
+        const def = placeDefaults[type];
+        if (def) applyFramePlacement(frame.id, image, def);
+        else {
+          setRememberChoice(false);
+          setPlacePrompt({ image, type, frameId: frame.id });
+        }
+        return;
+      }
+      // unsupported on a frame → re-route to the board (never reject)
+    }
+    addObject(image, type, wx, wy, OVERLAY_TYPES.has(type));
+  };
+  const armAsset = (image: string, type: string) => {
+    setArmed({ image, type });
+    toast("Click the canvas to place. Esc to cancel.");
+  };
+  const commitZoom = () => {
+    setZoomEditing(false);
+    const pct = parseInt(zoomInput, 10);
+    if (!Number.isFinite(pct)) return;
+    const nz = Math.min(3, Math.max(0.2, pct / 100));
+    const el = boardRef.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    const mx = r.width / 2;
+    const my = r.height / 2;
+    setView((v) => ({
+      zoom: nz,
+      x: mx - (mx - v.x) * (nz / v.zoom),
+      y: my - (my - v.y) * (nz / v.zoom),
+    }));
+  };
+
   const boardPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     const el = boardRef.current;
     if (!el) return;
     // Clicking outside an open size dropdown just closes it; edit mode stays on.
     if (openPlatform) {
       setOpenPlatform(null);
+      return;
+    }
+    // Click-to-place: drop the armed asset where the user clicked.
+    if (armed) {
+      placeAssetAt(armed.image, armed.type, e.clientX, e.clientY);
+      setArmed(null);
       return;
     }
     const r = el.getBoundingClientRect();
@@ -2436,11 +2683,14 @@ function Composer({
     }
     // Empty-space click: deselect and start panning.
     setSelectedFrameId(null);
+    setSelectedObjectId(null);
+    setPanning(true);
     panRef.current = { startX: e.clientX, startY: e.clientY, ox: view.x, oy: view.y };
     el.setPointerCapture(e.pointerId);
   };
   // Begin dragging a frame (pointer is captured on the board so fast drags don't escape).
   const onFrameDragStart = (frame: BoardFrameData, e: React.PointerEvent) => {
+    setSelectedObjectId(null);
     frameDragRef.current = {
       id: frame.id,
       startX: e.clientX,
@@ -2450,11 +2700,32 @@ function Composer({
     };
     boardRef.current?.setPointerCapture(e.pointerId);
   };
+  const onObjectDragStart = (obj: BoardObject, e: React.PointerEvent) => {
+    setSelectedObjectId(obj.id);
+    setSelectedFrameId(null);
+    objDragRef.current = {
+      id: obj.id,
+      startX: e.clientX,
+      startY: e.clientY,
+      ox: obj.x,
+      oy: obj.y,
+    };
+    boardRef.current?.setPointerCapture(e.pointerId);
+  };
   const boardPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
     const el = boardRef.current;
     if (!el) return;
     const r = el.getBoundingClientRect();
     if (placing) setGhost({ x: e.clientX - r.left, y: e.clientY - r.top });
+    const od = objDragRef.current;
+    if (od) {
+      const dx = (e.clientX - od.startX) / view.zoom;
+      const dy = (e.clientY - od.startY) / view.zoom;
+      setObjects((os) =>
+        os.map((o) => (o.id === od.id ? { ...o, x: od.ox + dx, y: od.oy + dy } : o)),
+      );
+      return;
+    }
     const fd = frameDragRef.current;
     if (fd) {
       const dx = (e.clientX - fd.startX) / view.zoom;
@@ -2474,7 +2745,9 @@ function Composer({
   };
   const boardPointerUp = () => {
     frameDragRef.current = null;
+    objDragRef.current = null;
     panRef.current = null;
+    setPanning(false);
   };
   // ----- "Select to Send" panel -----
   const [sendPlatforms, setSendPlatforms] = useState<string[]>(DEFAULT_SEND_PLATFORMS);
@@ -2633,7 +2906,11 @@ function Composer({
       {/* LEFT */}
       <div className="relative flex h-auto flex-col overflow-y-auto bg-card p-7 lg:h-full">
         {openCategory ? (
-          <AssetExplorer category={openCategory} onBack={() => setOpenCategory(null)} />
+          <AssetExplorer
+            category={openCategory}
+            onBack={() => setOpenCategory(null)}
+            onPick={(image, type) => armAsset(image, type)}
+          />
         ) : (
           <>
             <div className="flex items-center justify-between">
@@ -2827,13 +3104,25 @@ function Composer({
             onPointerDown={boardPointerDown}
             onPointerMove={boardPointerMove}
             onPointerUp={boardPointerUp}
+            onDragOver={(e) => {
+              e.preventDefault();
+              e.dataTransfer.dropEffect = "copy";
+            }}
+            onDrop={(e) => {
+              e.preventDefault();
+              const img = e.dataTransfer.getData("text/omni-asset");
+              if (img) placeAssetAt(img, openCategory ?? "Photos", e.clientX, e.clientY);
+            }}
             className="relative min-h-[420px] flex-1 overflow-hidden rounded-2xl lg:min-h-0"
-            style={{ cursor: placing ? "crosshair" : "grab", touchAction: "none" }}
+            style={{ cursor: placing || armed ? "crosshair" : "grab", touchAction: "none" }}
           >
-            {/* World — pans and zooms; frames live in its coordinate space */}
+            {/* World — pans and zooms; frames and placed objects live in its space */}
             <div
               className="pointer-events-none absolute left-0 top-0 origin-top-left"
-              style={{ transform: `translate(${view.x}px, ${view.y}px) scale(${view.zoom})` }}
+              style={{
+                transform: `translate(${view.x}px, ${view.y}px) scale(${view.zoom})`,
+                transition: panning ? "none" : "transform 140ms ease-out",
+              }}
             >
               {frames.map((f) => (
                 <BoardFrame
@@ -2851,6 +3140,29 @@ function Composer({
                   }
                   onDragStart={(e) => onFrameDragStart(f, e)}
                 />
+              ))}
+
+              {/* Placed assets (free objects / overlays) */}
+              {objects.map((o) => (
+                <div
+                  key={o.id}
+                  className={`pointer-events-auto absolute cursor-move overflow-hidden rounded-md ${
+                    selectedObjectId === o.id ? "ring-2 ring-blue-500" : ""
+                  }`}
+                  style={{ left: o.x, top: o.y, width: o.w, height: o.h }}
+                  onPointerDown={(e) => {
+                    if (placing || armed) return;
+                    e.stopPropagation();
+                    onObjectDragStart(o, e);
+                  }}
+                >
+                  <img
+                    src={o.image}
+                    alt=""
+                    draggable={false}
+                    className={`h-full w-full ${o.overlay ? "object-contain" : "object-cover"}`}
+                  />
+                </div>
               ))}
             </div>
 
@@ -2950,9 +3262,35 @@ function Composer({
               );
             })()}
 
-            {/* Zoom indicator */}
-            <div className="pointer-events-none absolute bottom-3 left-3 rounded-lg bg-card/90 px-2 py-1 text-xs font-semibold text-muted-foreground shadow">
-              {Math.round(view.zoom * 100)}%
+            {/* Zoom indicator — click to type an exact percentage */}
+            <div onPointerDown={(e) => e.stopPropagation()} className="absolute bottom-3 left-3">
+              {zoomEditing ? (
+                <div className="flex items-center rounded-lg bg-card px-2 py-1 text-xs font-semibold shadow ring-2 ring-primary/40">
+                  <input
+                    autoFocus
+                    value={zoomInput}
+                    onChange={(e) => setZoomInput(e.target.value.replace(/[^0-9]/g, ""))}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") commitZoom();
+                      if (e.key === "Escape") setZoomEditing(false);
+                    }}
+                    onBlur={commitZoom}
+                    className="w-9 bg-transparent text-right outline-none"
+                  />
+                  <span className="text-muted-foreground">%</span>
+                </div>
+              ) : (
+                <button
+                  onClick={() => {
+                    setZoomInput(String(Math.round(view.zoom * 100)));
+                    setZoomEditing(true);
+                  }}
+                  title="Click to set an exact zoom"
+                  className="rounded-lg bg-card/90 px-2 py-1 text-xs font-semibold text-muted-foreground shadow transition hover:text-foreground hover:ring-1 hover:ring-primary/40"
+                >
+                  {Math.round(view.zoom * 100)}%
+                </button>
+              )}
             </div>
 
             {/* Lower editing toolbar with collapsible dock */}
@@ -3234,6 +3572,59 @@ function Composer({
           </button>
         </div>
       </div>
+
+      {/* "Place Asset in Frame" modal (photo/video/animation/pdf onto a frame) */}
+      {placePrompt && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm"
+          onClick={() => setPlacePrompt(null)}
+        >
+          <div
+            className="w-full max-w-sm rounded-2xl border border-border bg-card p-6 text-foreground shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-lg font-bold">Place Asset in Frame</h3>
+            <p className="mt-1 text-sm text-muted-foreground">
+              How would you like this content placed?
+            </p>
+            <div className="mt-4 space-y-2">
+              {(
+                [
+                  ["fill", "Fill Frame", "Cover the frame; crop overflow."],
+                  ["fit", "Fit Entire Asset", "Show the whole asset; letterbox."],
+                  ["free", "Place Freely", "Drop on the frame; move it yourself."],
+                ] as const
+              ).map(([mode, label, desc]) => (
+                <button
+                  key={mode}
+                  onClick={() => {
+                    applyFramePlacement(placePrompt.frameId, placePrompt.image, mode);
+                    if (rememberChoice)
+                      setPlaceDefaults((d) => ({ ...d, [placePrompt.type]: mode }));
+                    setPlacePrompt(null);
+                  }}
+                  className="flex w-full items-center justify-between gap-3 rounded-xl border border-border bg-secondary/40 px-4 py-3 text-left transition hover:border-primary hover:bg-muted"
+                >
+                  <span>
+                    <span className="block text-sm font-bold">{label}</span>
+                    <span className="block text-xs text-muted-foreground">{desc}</span>
+                  </span>
+                  <ArrowRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+                </button>
+              ))}
+            </div>
+            <label className="mt-4 flex cursor-pointer items-center gap-2 text-xs text-muted-foreground">
+              <input
+                type="checkbox"
+                checked={rememberChoice}
+                onChange={(e) => setRememberChoice(e.target.checked)}
+                className="accent-[color:var(--primary)]"
+              />
+              Always do this for {placePrompt.type} this session
+            </label>
+          </div>
+        </div>
+      )}
 
       {/* "Use this idea?" confirmation modal */}
       {pendingIdea && (
