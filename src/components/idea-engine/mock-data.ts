@@ -161,10 +161,12 @@ function makeTrendFrom(base: TrendIdea, title: string): TrendIdea {
 }
 
 // Simulated AI trend generation for "Generate more ideas" — appended to the
-// existing list rather than replacing it. Uses up genuinely-unshown topics
-// first (as-is); only once those run out does it recycle pool items, always
-// with a distinct "angle" label so a recycled card never silently duplicates
-// a title already on screen. Swap this out for a real backend/AI call later.
+// existing list rather than replacing it, every click, indefinitely. Uses up
+// genuinely-unshown topics first (as-is); once those run out, recycles pool
+// items under a distinct "angle" label; once every topic/angle combo has
+// been shown too, falls back to a numbered suffix. Every tier is checked
+// against everything already on screen, so repeated clicks never produce an
+// exact duplicate title. Swap this out for a real backend/AI call later.
 export function generateAdditionalTrends(existingTitles: string[], count = 9): TrendIdea[] {
   const shown = new Set(existingTitles);
   const picks: TrendIdea[] = [];
@@ -175,35 +177,33 @@ export function generateAdditionalTrends(existingTitles: string[], count = 9): T
     shown.add(base.title);
   }
 
-  const cycle = shuffle(TREND_POOL);
-  let i = 0;
+  if (picks.length < count) {
+    const combos = shuffle(
+      TREND_POOL.flatMap((base) => MORE_IDEAS_ANGLES.map((angle) => ({ base, angle }))),
+    ).filter(({ base, angle }) => !shown.has(`${angle}: ${base.title}`));
+
+    for (const { base, angle } of combos) {
+      if (picks.length >= count) break;
+      const title = `${angle}: ${base.title}`;
+      picks.push(makeTrendFrom(base, title));
+      shown.add(title);
+    }
+  }
+
+  let suffix = 2;
   while (picks.length < count) {
-    const base = cycle[i % cycle.length];
-    const angle = MORE_IDEAS_ANGLES[i % MORE_IDEAS_ANGLES.length];
-    picks.push(makeTrendFrom(base, `${angle}: ${base.title}`));
-    i++;
+    const base = TREND_POOL[picks.length % TREND_POOL.length];
+    const title = `${base.title} (${suffix})`;
+    if (shown.has(title)) {
+      suffix++;
+      continue;
+    }
+    picks.push(makeTrendFrom(base, title));
+    shown.add(title);
+    suffix++;
   }
 
   return picks;
-}
-
-// Simulated "related ideas" generation for a single trend. Swap this out for
-// a real backend/AI call later.
-export function generateSimilarIdeas(trend: TrendIdea): TrendIdea[] {
-  const angles = [
-    "Behind-the-scenes look",
-    "Beginner-friendly breakdown",
-    "Myth-busting explainer",
-    "Before-and-after story",
-    "Expert Q&A format",
-    "Community poll or challenge",
-  ];
-  return angles.map((angle, i) => ({
-    id: `${trend.id}-similar-${i}`,
-    title: `${angle}: ${trend.title}`,
-    description: `${angle} take on "${trend.title}" — tailored for fast, scroll-stopping engagement.`,
-    hashtags: trend.hashtags,
-  }));
 }
 
 // ---------- BRAINSTORM GOALS ----------
