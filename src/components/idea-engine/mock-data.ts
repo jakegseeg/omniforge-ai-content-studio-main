@@ -23,6 +23,18 @@ export type IdeaSeed = {
 export const PLACEHOLDER_IDEA_THUMB =
   "https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=300";
 
+// A trend/similar idea the user clicked, to prefill the brainstorm input.
+// `nonce` makes every selection distinct so re-clicking the same idea still
+// re-triggers the prefill effect.
+export type PrefillIdea = {
+  text: string;
+  nonce: number;
+};
+
+export function ideaToPrefillText(idea: TrendIdea): string {
+  return `${idea.title}: ${idea.description}`;
+}
+
 // ---------- TRENDING IDEAS ----------
 // Backend integration point: replace with a scheduled AI request that returns
 // today's trend set. For now we rotate through a realistic placeholder pool.

@@ -1,9 +1,9 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { ArrowLeft } from "lucide-react";
 import type { ComposerSeed, View } from "@/routes/index";
 import { TrendingIdeas } from "./TrendingIdeas";
 import { BrainstormPanel } from "./BrainstormPanel";
-import type { IdeaSeed } from "./mock-data";
+import { ideaToPrefillText, type IdeaSeed, type PrefillIdea, type TrendIdea } from "./mock-data";
 
 function getGreeting(): string {
   const hour = new Date().getHours();
@@ -20,12 +20,19 @@ export function AiIdeaEngine({
   // Tracks the most recent idea sent toward the Composer, so the back arrow
   // can hand it along (spec: preserve data if any idea was generated/selected).
   const [lastIdea, setLastIdea] = useState<IdeaSeed | null>(null);
+  const [prefillIdea, setPrefillIdea] = useState<PrefillIdea | null>(null);
+  const brainstormRef = useRef<HTMLDivElement>(null);
 
   const backToComposer = () => navigate("composer", lastIdea ?? undefined);
 
   const handleSendToComposer = (seed: IdeaSeed) => {
     setLastIdea(seed);
     navigate("composer", seed);
+  };
+
+  const handleSelectIdea = (idea: TrendIdea) => {
+    setPrefillIdea({ text: ideaToPrefillText(idea), nonce: Date.now() });
+    brainstormRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
   return (
@@ -43,8 +50,10 @@ export function AiIdeaEngine({
       </p>
 
       <div className="mt-8 space-y-6">
-        <TrendingIdeas />
-        <BrainstormPanel onSendToComposer={handleSendToComposer} />
+        <TrendingIdeas onSelectIdea={handleSelectIdea} />
+        <div ref={brainstormRef}>
+          <BrainstormPanel prefillIdea={prefillIdea} onSendToComposer={handleSendToComposer} />
+        </div>
       </div>
     </div>
   );

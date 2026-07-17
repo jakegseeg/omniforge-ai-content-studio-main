@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Loader2, Send, Sparkles } from "lucide-react";
+import { toast } from "sonner";
 import {
   FOLLOW_UP_QUESTIONS,
   GOAL_OPTIONS,
@@ -11,9 +12,16 @@ import {
   type ChatMessage,
   type Goal,
   type IdeaSeed,
+  type PrefillIdea,
 } from "./mock-data";
 
-export function BrainstormPanel({ onSendToComposer }: { onSendToComposer: (seed: IdeaSeed) => void }) {
+export function BrainstormPanel({
+  prefillIdea,
+  onSendToComposer,
+}: {
+  prefillIdea: PrefillIdea | null;
+  onSendToComposer: (seed: IdeaSeed) => void;
+}) {
   const [ideaText, setIdeaText] = useState("");
   const [goal, setGoal] = useState<Goal>(GOAL_OPTIONS[0]);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -26,6 +34,17 @@ export function BrainstormPanel({ onSendToComposer }: { onSendToComposer: (seed:
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages.length, isReplying]);
+
+  // Fill the idea input when a trend/similar idea is clicked elsewhere on the page.
+  useEffect(() => {
+    if (!prefillIdea) return;
+    if (messages.length > 0) {
+      toast("Finish or send your current brainstorm before picking a new idea.");
+      return;
+    }
+    setIdeaText(prefillIdea.text);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [prefillIdea]);
 
   // Backend integration point: replace with a real LLM call. Picks an unused
   // follow-up question or improvement suggestion so the conversation doesn't

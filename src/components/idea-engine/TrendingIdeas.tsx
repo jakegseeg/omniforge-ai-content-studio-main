@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { ChevronDown, Loader2, RefreshCw, Sparkles } from "lucide-react";
 import { generateSimilarIdeas, generateTrends, INITIAL_TRENDS, type TrendIdea } from "./mock-data";
 
-export function TrendingIdeas() {
+export function TrendingIdeas({ onSelectIdea }: { onSelectIdea: (idea: TrendIdea) => void }) {
   const [trends, setTrends] = useState<TrendIdea[]>(INITIAL_TRENDS);
   const [expandedTrendId, setExpandedTrendId] = useState<string | null>(null);
   const [similarByTrend, setSimilarByTrend] = useState<Record<string, TrendIdea[]>>({});
@@ -65,7 +65,16 @@ export function TrendingIdeas() {
           return (
             <div
               key={trend.id}
-              className="flex flex-col rounded-xl border border-border bg-card p-4 transition hover:border-primary/40"
+              role="button"
+              tabIndex={0}
+              onClick={() => onSelectIdea(trend)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  onSelectIdea(trend);
+                }
+              }}
+              className="flex cursor-pointer flex-col rounded-xl border border-border bg-card p-4 transition hover:border-primary/40"
             >
               <h4 className="text-sm font-bold text-foreground">{trend.title}</h4>
               <p className="mt-1.5 line-clamp-3 text-xs text-muted-foreground">{trend.description}</p>
@@ -82,7 +91,10 @@ export function TrendingIdeas() {
 
               <button
                 type="button"
-                onClick={() => toggleSimilar(trend)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  toggleSimilar(trend);
+                }}
                 aria-expanded={isExpanded}
                 className="mt-4 inline-flex w-full items-center justify-center gap-1.5 rounded-lg border border-border bg-secondary/40 px-3 py-2 text-xs font-semibold text-foreground transition hover:border-primary hover:text-primary"
               >
@@ -97,7 +109,23 @@ export function TrendingIdeas() {
                 <div className="mt-3 max-h-56 space-y-2 overflow-y-auto scroll-smooth pr-1 animate-in fade-in slide-in-from-top-1 duration-200">
                   {similar ? (
                     similar.map((idea) => (
-                      <div key={idea.id} className="rounded-lg border border-border bg-secondary/20 p-2.5">
+                      <div
+                        key={idea.id}
+                        role="button"
+                        tabIndex={0}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onSelectIdea(idea);
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            onSelectIdea(idea);
+                          }
+                        }}
+                        className="cursor-pointer rounded-lg border border-border bg-secondary/20 p-2.5 transition hover:border-primary"
+                      >
                         <p className="text-xs font-semibold text-foreground">{idea.title}</p>
                         <p className="mt-0.5 line-clamp-2 text-[11px] text-muted-foreground">
                           {idea.description}
