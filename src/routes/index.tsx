@@ -63,17 +63,36 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 export const Route = createFileRoute("/")({
   component: OmniForgeApp,
 });
 
-type View = "metrics" | "dashboard" | "ideas" | "composer" | "calendar" | "settings";
+type View =
+  | "metrics"
+  | "dashboard"
+  | "ideas"
+  | "composer"
+  | "calendar"
+  | "schedule-post"
+  | "settings";
 
 interface ComposerSeed {
   caption: string;
   thumbnail: string;
   title: string;
+}
+
+interface PendingPost {
+  caption: string;
+  thumb: string;
+  platform: "linkedin" | "instagram" | "twitter";
 }
 
 const ACCESS_CODES = ["admin123", "omni2026"];
@@ -147,7 +166,12 @@ const ASSET_GROUPS: {
 
 const INITIAL_CALENDAR: Record<
   string,
-  { caption: string; thumb: string; platform: "linkedin" | "instagram" | "twitter" }[]
+  {
+    caption: string;
+    thumb: string;
+    platform: "linkedin" | "instagram" | "twitter";
+    time?: string;
+  }[]
 > = {
   Mon: [
     {
@@ -199,6 +223,84 @@ const INITIAL_CALENDAR: Record<
   ],
 };
 
+const TIME_SLOTS = [
+  "8:00 AM",
+  "9:00 AM",
+  "10:00 AM",
+  "11:00 AM",
+  "12:00 PM",
+  "1:00 PM",
+  "2:00 PM",
+  "3:00 PM",
+  "4:00 PM",
+  "5:00 PM",
+  "6:00 PM",
+  "7:00 PM",
+  "8:00 PM",
+  "9:00 PM",
+];
+
+const RECOMMENDED_SLOTS: Record<string, { time: string; reason: string }[]> = {
+  Mon: [
+    {
+      time: "9:00 AM",
+      reason: "Monday morning commute — your audience checks feeds before the workday starts.",
+    },
+    {
+      time: "5:00 PM",
+      reason: "End-of-day scroll — engagement typically spikes as your audience logs off.",
+    },
+  ],
+  Tue: [
+    {
+      time: "12:00 PM",
+      reason: "Lunchtime browsing — historically your highest-engagement window on Tuesdays.",
+    },
+  ],
+  Wed: [
+    {
+      time: "9:00 AM",
+      reason: "Midweek momentum — Wednesday morning posts see above-average click-through.",
+    },
+    {
+      time: "6:00 PM",
+      reason: "Evening wind-down — your audience is most active after dinner.",
+    },
+  ],
+  Thu: [
+    {
+      time: "11:00 AM",
+      reason: "Late-morning peak — a consistent high-engagement slot for your followers.",
+    },
+    {
+      time: "7:00 PM",
+      reason: "Prime-time engagement — Thursday evenings drive your strongest shares.",
+    },
+  ],
+  Fri: [
+    {
+      time: "9:00 AM",
+      reason: "Friday morning catch-up — activity trends up ahead of the weekend.",
+    },
+    {
+      time: "3:00 PM",
+      reason: "Early weekend wind-down — engagement rises as the workweek closes out.",
+    },
+  ],
+  Sat: [
+    {
+      time: "11:00 AM",
+      reason: "Weekend leisure browsing — late morning is your top Saturday slot.",
+    },
+  ],
+  Sun: [
+    {
+      time: "6:00 PM",
+      reason: "Sunday evening planning — your audience preps for the week ahead.",
+    },
+  ],
+};
+
 const AI_CLIPS = [
   {
     name: "Hook Intro",
@@ -224,6 +326,7 @@ function OmniForgeApp() {
   const [authed, setAuthed] = useState(false);
   const [view, setView] = useState<View>("metrics");
   const [composerSeed, setComposerSeed] = useState<ComposerSeed | null>(null);
+  const [pendingPost, setPendingPost] = useState<PendingPost | null>(null);
   const [calendar, setCalendar] = useState(INITIAL_CALENDAR);
   // Light is the default (what users see on first login); choice persists.
   const [theme, setTheme] = useState<Theme>("light");
@@ -259,12 +362,29 @@ function OmniForgeApp() {
             <Composer
               seed={composerSeed}
               onExplore={() => setView("ideas")}
-              onSchedule={(item) => {
-                setCalendar((c) => ({ ...c, Thu: [...c.Thu, item] }));
+              onApprove={(item) => {
+                setPendingPost(item);
+                setView("schedule-post");
               }}
             />
           )}
-          {view === "calendar" && <CalendarView calendar={calendar} />}
+          {view === "schedule-post" && pendingPost && (
+            <ScheduleCalendarView
+              pendingPost={pendingPost}
+              calendar={calendar}
+              onConfirm={(day, time) => {
+                toast.success(`Scheduled for ${day} at ${time}`);
+                setCalendar((c) => ({ ...c, [day]: [...c[day], { ...pendingPost, time }] }));
+                setPendingPost(null);
+                setView("calendar");
+              }}
+              onCancel={() => {
+                setPendingPost(null);
+                setView("calendar");
+              }}
+            />
+          )}
+          {view === "calendar" && <CalendarView calendar={calendar} navigate={navigate} />}
           {view === "settings" && <SettingsView />}
         </div>
       </main>
@@ -1465,15 +1585,11 @@ function IdeaEngine({ navigate }: { navigate: (v: View, seed?: ComposerSeed) => 
 function Composer({
   seed,
   onExplore,
-  onSchedule,
+  onApprove,
 }: {
   seed: ComposerSeed | null;
   onExplore: () => void;
-  onSchedule: (item: {
-    caption: string;
-    thumb: string;
-    platform: "linkedin" | "instagram" | "twitter";
-  }) => void;
+  onApprove: (item: PendingPost) => void;
 }) {
   const [selectedAsset, setSelectedAsset] = useState<string>(
     seed?.thumbnail || ASSET_GROUPS[0].items[0].url,
@@ -1545,8 +1661,7 @@ function Composer({
   };
 
   const approve = () => {
-    onSchedule({ caption: caption.slice(0, 60), thumb: selectedAsset, platform: "instagram" });
-    toast.success("Approved & scheduled to calendar");
+    onApprove({ caption: caption.slice(0, 60), thumb: selectedAsset, platform: "instagram" });
   };
 
   return (
@@ -1886,7 +2001,13 @@ function ToggleRow({
 }
 
 // ---------- CALENDAR ----------
-function CalendarView({ calendar }: { calendar: typeof INITIAL_CALENDAR }) {
+function CalendarView({
+  calendar,
+  navigate,
+}: {
+  calendar: typeof INITIAL_CALENDAR;
+  navigate: (v: View, seed?: ComposerSeed) => void;
+}) {
   const [locked, setLocked] = useState(false);
   const days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
   return (
@@ -1954,8 +2075,13 @@ function CalendarView({ calendar }: { calendar: typeof INITIAL_CALENDAR }) {
                         {p.caption}
                       </p>
                     </div>
-                    <div className="mt-2">
+                    <div className="mt-2 flex items-center justify-between gap-2">
                       <PlatformBadge platform={p.platform} small />
+                      {p.time && (
+                        <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground">
+                          <Clock className="h-3 w-3" /> {p.time}
+                        </span>
+                      )}
                     </div>
                   </div>
                 ))
@@ -1964,11 +2090,127 @@ function CalendarView({ calendar }: { calendar: typeof INITIAL_CALENDAR }) {
                   No posts
                 </div>
               )}
+              <button
+                onClick={() => navigate("composer", { caption: "", thumbnail: "", title: "" })}
+                aria-label={`Add post for ${d} ${18 + i}`}
+                className="grid h-8 w-full place-items-center rounded-lg border border-dashed border-border text-muted-foreground transition hover:border-primary/50 hover:text-primary"
+              >
+                <Plus className="h-4 w-4" />
+              </button>
             </div>
           </div>
         ))}
       </div>
     </div>
+  );
+}
+
+function ScheduleCalendarView({
+  pendingPost,
+  calendar,
+  onConfirm,
+  onCancel,
+}: {
+  pendingPost: PendingPost;
+  calendar: typeof INITIAL_CALENDAR;
+  onConfirm: (day: string, time: string) => void;
+  onCancel: () => void;
+}) {
+  const days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+  return (
+    <TooltipProvider delayDuration={150}>
+      <div className="flex h-[calc(100vh-4rem)] flex-col overflow-y-auto px-8 py-8">
+        <Header
+          title="Choose a Time to Publish"
+          subtitle="Highlighted slots are AI-recommended for this post."
+        />
+
+        <div className="mt-6 flex items-center gap-4 rounded-2xl border border-primary/30 bg-primary/5 p-4">
+          <img
+            src={pendingPost.thumb}
+            alt=""
+            className="h-14 w-14 shrink-0 rounded-lg object-cover"
+          />
+          <p className="line-clamp-2 flex-1 text-sm text-foreground/90">{pendingPost.caption}</p>
+          <PlatformBadge platform={pendingPost.platform} />
+          <button
+            onClick={onCancel}
+            className="inline-flex shrink-0 items-center gap-1 text-sm font-semibold text-muted-foreground transition hover:text-foreground"
+          >
+            <ArrowLeft className="h-3.5 w-3.5" /> Cancel
+          </button>
+        </div>
+
+        <div className="mt-6 grid min-h-0 flex-1 grid-cols-1 gap-3 sm:grid-cols-2 lg:auto-rows-fr lg:grid-cols-7">
+          {days.map((d, i) => {
+            const existing = calendar[d] ?? [];
+            const recommended = RECOMMENDED_SLOTS[d] ?? [];
+            return (
+              <div
+                key={d}
+                className="glass-card flex min-h-[280px] flex-col rounded-2xl border-2 border-dashed border-primary/30 p-3 lg:h-full lg:min-h-0"
+              >
+                <div className="mb-2 flex items-baseline justify-between border-b border-border pb-2">
+                  <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                    {d}
+                  </span>
+                  <span className="text-lg font-semibold">{18 + i}</span>
+                </div>
+
+                {existing.length > 0 && (
+                  <div className="mb-2 flex flex-wrap items-center gap-1">
+                    {existing.map((p, idx) => (
+                      <PlatformBadge key={idx} platform={p.platform} small />
+                    ))}
+                    <span className="text-[9px] text-muted-foreground">already scheduled</span>
+                  </div>
+                )}
+
+                <div className="flex min-h-0 flex-1 flex-col gap-1.5 overflow-y-auto pr-1">
+                  {TIME_SLOTS.map((time) => {
+                    const rec = recommended.find((r) => r.time === time);
+                    const slotButton = (
+                      <button
+                        key={time}
+                        onClick={() => onConfirm(d, time)}
+                        className={`w-full rounded-lg border px-2.5 py-1.5 text-left text-[11px] font-medium transition ${
+                          rec
+                            ? "border-primary/40 bg-primary/10 text-primary hover:bg-primary/20"
+                            : "border-border bg-secondary/20 text-foreground/80 hover:border-primary/40 hover:bg-secondary/40"
+                        }`}
+                      >
+                        <span className="flex items-center justify-between">
+                          <span className="inline-flex items-center gap-1.5">
+                            <Clock className="h-3 w-3" /> {time}
+                          </span>
+                          {rec && <Sparkles className="h-3 w-3 text-primary" />}
+                        </span>
+                        {rec && (
+                          <span className="mt-0.5 block text-[9px] font-semibold uppercase tracking-wider text-primary/80">
+                            AI Recommended
+                          </span>
+                        )}
+                      </button>
+                    );
+
+                    if (!rec) return slotButton;
+
+                    return (
+                      <Tooltip key={time}>
+                        <TooltipTrigger asChild>{slotButton}</TooltipTrigger>
+                        <TooltipContent side="top" className="max-w-[220px] text-center">
+                          {rec.reason}
+                        </TooltipContent>
+                      </Tooltip>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </TooltipProvider>
   );
 }
 
