@@ -1575,6 +1575,16 @@ function PlatformMetricDetail({
                           {aiSummary.whatToImprove}
                         </p>
                       </div>
+                      <div className="mt-auto flex justify-end pt-4">
+                        <button
+                          onClick={() =>
+                            toast.success(`Recommended edit applied to "${post.title}" draft`)
+                          }
+                          className="inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground shadow shadow-primary/25 transition hover:brightness-110"
+                        >
+                          <FileText className="h-3.5 w-3.5" /> Edit Post
+                        </button>
+                      </div>
                     </div>
                   );
                 })}
