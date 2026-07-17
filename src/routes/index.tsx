@@ -1254,42 +1254,112 @@ function PlatformMetricDetail({
       </div>
 
       <div className="mt-8 grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
-        <section className="glass-card rounded-2xl p-5">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-            <div>
-              <h3 className="text-xl font-semibold tracking-tight">
-                {selectedMetricLabel} over time
-              </h3>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Comparing top posts by days since publish keeps posts with different dates fair.
-              </p>
+        <div className="min-w-0 space-y-5">
+          <section className="glass-card rounded-2xl p-5">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+              <div>
+                <h3 className="text-xl font-semibold tracking-tight">
+                  {selectedMetricLabel} over time
+                </h3>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Comparing top posts by days since publish keeps posts with different dates fair.
+                </p>
+              </div>
+              <div className="grid grid-cols-2 gap-2 sm:flex">
+                {METRIC_OPTIONS.map((option) => (
+                  <button
+                    key={option.key}
+                    onClick={() => setSelectedMetric(option.key)}
+                    className={`inline-flex items-center justify-center gap-2 rounded-xl px-3 py-2 text-xs font-semibold transition ${
+                      selectedMetric === option.key
+                        ? "bg-primary text-primary-foreground shadow shadow-primary/30"
+                        : "border border-border bg-secondary/30 text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    <option.icon className="h-3.5 w-3.5" /> {option.label}
+                  </button>
+                ))}
+              </div>
             </div>
-            <div className="grid grid-cols-2 gap-2 sm:flex">
-              {METRIC_OPTIONS.map((option) => (
-                <button
-                  key={option.key}
-                  onClick={() => setSelectedMetric(option.key)}
-                  className={`inline-flex items-center justify-center gap-2 rounded-xl px-3 py-2 text-xs font-semibold transition ${
-                    selectedMetric === option.key
-                      ? "bg-primary text-primary-foreground shadow shadow-primary/30"
-                      : "border border-border bg-secondary/30 text-muted-foreground hover:text-foreground"
-                  }`}
-                >
-                  <option.icon className="h-3.5 w-3.5" /> {option.label}
-                </button>
-              ))}
+
+            <PostTrendChart posts={visiblePosts} metricKey={selectedMetric} />
+
+            <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-border pt-4 text-xs text-muted-foreground">
+              <span className="rounded-full bg-primary/10 px-2.5 py-1 font-semibold text-primary">
+                Showing top {visiblePosts.length}
+              </span>
+              <span>Use the list to pin a focused set when a platform has many posts.</span>
             </div>
-          </div>
+          </section>
 
-          <PostTrendChart posts={visiblePosts} metricKey={selectedMetric} />
+          <section className="glass-card rounded-2xl p-5">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <h3 className="text-lg font-semibold tracking-tight">Tracked posts</h3>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Ranked by blended performance, then summarized from comment momentum.
+                </p>
+              </div>
+              <span className="w-fit rounded-full border border-border bg-secondary/40 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                Top {rankedPosts.length}
+              </span>
+            </div>
 
-          <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-border pt-4 text-xs text-muted-foreground">
-            <span className="rounded-full bg-primary/10 px-2.5 py-1 font-semibold text-primary">
-              Showing top {visiblePosts.length}
-            </span>
-            <span>Use the list to pin a focused set when a platform has many posts.</span>
-          </div>
-        </section>
+            <div className="mt-5 overflow-x-auto pb-1">
+              <div className="flex gap-3">
+                {rankedPosts.map((post, index) => {
+                  const firstValue = post.values[selectedMetric][0];
+                  const lastValue = post.values[selectedMetric].at(-1) ?? firstValue;
+                  const movement = lastValue - firstValue;
+                  const aiSummary = getAiPostSummary(post, index + 1);
+                  return (
+                    <div
+                      key={post.title}
+                      className="flex min-w-[290px] max-w-[330px] flex-1 flex-col rounded-xl border border-border bg-secondary/30 p-3 transition hover:border-primary/30 hover:bg-secondary/40"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="grid h-6 w-6 shrink-0 place-items-center rounded-md bg-primary/15 text-[11px] font-semibold text-primary">
+                              {index + 1}
+                            </span>
+                            <div className="truncate text-sm font-semibold">{post.title}</div>
+                          </div>
+                          <div className="mt-1 text-xs text-muted-foreground">
+                            {post.type} · posted {post.date}
+                          </div>
+                        </div>
+                        <TrendBadge status={post.status} value={movement} />
+                      </div>
+                      <div className="mt-3 flex flex-wrap items-center gap-2 text-[11px]">
+                        <span className="rounded-full bg-primary/10 px-2 py-1 font-semibold text-primary">
+                          {aiSummary.headline}
+                        </span>
+                        <span className="rounded-full border border-border bg-background/40 px-2 py-1 text-muted-foreground">
+                          Score {aiSummary.score}
+                        </span>
+                      </div>
+                      <div className="mt-3 space-y-2 text-xs leading-relaxed text-muted-foreground">
+                        <p>
+                          <span className="font-semibold text-foreground">Comments: </span>
+                          {aiSummary.commentSummary}
+                        </p>
+                        <p>
+                          <span className="font-semibold text-foreground">Sentiment: </span>
+                          {aiSummary.sentiment}
+                        </p>
+                        <p>
+                          <span className="font-semibold text-foreground">Edit: </span>
+                          {aiSummary.whatToImprove}
+                        </p>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </section>
+        </div>
 
         <section className="glass-card rounded-2xl p-5">
           <div className="flex items-center justify-between gap-3">
@@ -1331,74 +1401,6 @@ function PlatformMetricDetail({
                 <p className="mt-2 text-sm leading-relaxed">{insight.value}</p>
               </div>
             ))}
-          </div>
-
-          <div className="mt-6 flex items-center justify-between gap-3 border-t border-border pt-5">
-            <div>
-              <h3 className="text-lg font-semibold tracking-tight">Tracked posts</h3>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Ranked by blended performance, then summarized from comment momentum.
-              </p>
-            </div>
-            <span className="rounded-full border border-border bg-secondary/40 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-              Top {rankedPosts.length}
-            </span>
-          </div>
-
-          <div className="mt-5 space-y-3">
-            {rankedPosts.map((post, index) => {
-              const firstValue = post.values[selectedMetric][0];
-              const lastValue = post.values[selectedMetric].at(-1) ?? firstValue;
-              const movement = lastValue - firstValue;
-              const aiSummary = getAiPostSummary(post, index + 1);
-              return (
-                <div
-                  key={post.title}
-                  className="rounded-xl border border-border bg-secondary/30 p-3 transition hover:border-primary/30 hover:bg-secondary/40"
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="grid h-6 w-6 shrink-0 place-items-center rounded-md bg-primary/15 text-[11px] font-semibold text-primary">
-                          {index + 1}
-                        </span>
-                        <div className="truncate text-sm font-semibold">{post.title}</div>
-                      </div>
-                      <div className="mt-1 text-xs text-muted-foreground">
-                        {post.type} · posted {post.date}
-                      </div>
-                    </div>
-                    <TrendBadge status={post.status} value={movement} />
-                  </div>
-                  <div className="mt-3 flex flex-wrap items-center gap-2 text-[11px]">
-                    <span className="rounded-full bg-primary/10 px-2 py-1 font-semibold text-primary">
-                      {aiSummary.headline}
-                    </span>
-                    <span className="rounded-full border border-border bg-background/40 px-2 py-1 text-muted-foreground">
-                      Score {aiSummary.score}
-                    </span>
-                  </div>
-                  <div className="mt-3 space-y-2 text-xs leading-relaxed text-muted-foreground">
-                    <p>
-                      <span className="font-semibold text-foreground">Comment summary: </span>
-                      {aiSummary.commentSummary}
-                    </p>
-                    <p>
-                      <span className="font-semibold text-foreground">Audience sentiment: </span>
-                      {aiSummary.sentiment}
-                    </p>
-                    <p>
-                      <span className="font-semibold text-foreground">Why it worked: </span>
-                      {aiSummary.whyItWorked}
-                    </p>
-                    <p>
-                      <span className="font-semibold text-foreground">Potential edit: </span>
-                      {aiSummary.whatToImprove}
-                    </p>
-                  </div>
-                </div>
-              );
-            })}
           </div>
         </section>
       </div>
