@@ -54,6 +54,10 @@ import {
   TrendingDown,
   Moon,
   Sun,
+  LayoutGrid,
+  Layers,
+  PanelLeftOpen,
+  PanelLeftClose,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -2270,73 +2274,119 @@ function ToggleRow({
 }
 
 // ---------- CALENDAR ----------
+const PLATFORM_ICONS = {
+  linkedin: Linkedin,
+  instagram: Instagram,
+  twitter: Twitter,
+} as const;
+
+const PLATFORM_LABELS = {
+  linkedin: "LinkedIn",
+  instagram: "Instagram",
+  twitter: "X",
+} as const;
+
 function ApprovedQueueSidebar({
   queue,
   selectedIndex,
   onSelect,
+  onCollapse,
 }: {
   queue: PendingPost[];
   selectedIndex: number | null;
   onSelect: (index: number | null) => void;
+  onCollapse: () => void;
 }) {
+  const [view, setView] = useState<"grid" | "stack">("grid");
+
   return (
-    <div className="glass-card sticky top-20 flex w-64 shrink-0 flex-col rounded-2xl p-3">
-      <div className="mb-3 flex items-center justify-between border-b border-border pb-2">
-        <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-          Approved Posts
-        </span>
-        <span className="rounded-full bg-primary/15 px-2 py-0.5 text-[10px] font-semibold text-primary">
-          {queue.length}
-        </span>
+    <div className="glass-card sticky top-20 flex w-80 shrink-0 flex-col rounded-2xl p-4 transition-all duration-200">
+      <div className="flex items-start justify-between gap-2">
+        <div>
+          <h3 className="text-lg font-semibold tracking-tight">Ready to Schedule</h3>
+          <p className="mt-1 text-xs leading-snug text-muted-foreground">
+            {selectedIndex !== null
+              ? "Click a time slot on the calendar to schedule this post."
+              : queue.length > 0
+                ? "Select a post, then choose a day and time."
+                : "Approve a post from the Composer to see it here."}
+          </p>
+        </div>
+        <div className="flex shrink-0 items-center gap-1">
+          <div className="flex items-center gap-0.5 rounded-lg bg-secondary/60 p-0.5">
+            <button
+              type="button"
+              onClick={() => setView("grid")}
+              aria-label="Grid view"
+              className={`grid h-7 w-7 place-items-center rounded-md transition ${
+                view === "grid" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground"
+              }`}
+            >
+              <LayoutGrid className="h-3.5 w-3.5" />
+            </button>
+            <button
+              type="button"
+              onClick={() => setView("stack")}
+              aria-label="Stack view"
+              className={`grid h-7 w-7 place-items-center rounded-md transition ${
+                view === "stack" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground"
+              }`}
+            >
+              <Layers className="h-3.5 w-3.5" />
+            </button>
+          </div>
+          <button
+            type="button"
+            onClick={onCollapse}
+            aria-label="Collapse sidebar"
+            className="grid h-7 w-7 place-items-center rounded-md text-muted-foreground transition hover:bg-secondary/60 hover:text-foreground"
+          >
+            <PanelLeftClose className="h-3.5 w-3.5" />
+          </button>
+        </div>
       </div>
 
       {queue.length === 0 ? (
-        <div className="grid h-20 place-items-center rounded-lg border border-dashed border-border px-2 text-center text-[11px] text-muted-foreground">
+        <div className="mt-4 grid h-24 place-items-center rounded-lg border border-dashed border-border px-2 text-center text-[11px] text-muted-foreground">
           No posts waiting. Approve a post from the Composer.
         </div>
       ) : (
-        <div className="space-y-2">
+        <div className={`mt-4 grid gap-3 ${view === "grid" ? "grid-cols-2" : "grid-cols-1"}`}>
           {queue.map((p, idx) => {
             const selected = selectedIndex === idx;
+            const Icon = PLATFORM_ICONS[p.platform];
             return (
               <button
                 key={idx}
                 type="button"
                 onClick={() => onSelect(selected ? null : idx)}
-                className={`w-full select-none rounded-lg border p-2 text-left transition ${
+                className={`select-none overflow-hidden rounded-xl border bg-card text-left transition ${
                   selected
-                    ? "border-primary bg-primary/10 ring-2 ring-primary/40"
-                    : "border-border bg-secondary/40 hover:border-primary/50"
+                    ? "border-primary ring-2 ring-primary/40"
+                    : "border-border hover:border-primary/50"
                 }`}
               >
-                <div className="flex gap-2">
-                  <img
-                    src={p.thumb}
-                    alt=""
-                    className="h-10 w-10 shrink-0 rounded-md object-cover"
-                  />
-                  <p className="line-clamp-2 text-[11px] leading-snug text-foreground/90">
-                    {p.caption}
-                  </p>
-                </div>
-                <div className="mt-2 flex items-center justify-between gap-2">
-                  <PlatformBadge platform={p.platform} small />
+                <div className="relative aspect-square w-full overflow-hidden bg-secondary">
+                  <img src={p.thumb} alt="" className="h-full w-full object-cover" />
+                  <span className="absolute left-2 top-2 grid h-6 w-6 place-items-center rounded-md bg-black/70 text-white">
+                    <Icon className="h-3.5 w-3.5" />
+                  </span>
                   {selected && (
-                    <span className="text-[9px] font-semibold uppercase tracking-wider text-primary">
+                    <span className="absolute inset-0 grid place-items-center bg-primary/25 text-[10px] font-semibold uppercase tracking-wider text-white">
                       Pick a slot
                     </span>
                   )}
+                </div>
+                <div className={`p-2.5 ${view === "stack" ? "flex items-center justify-between gap-2" : ""}`}>
+                  <p className="truncate text-sm font-semibold text-foreground">
+                    {PLATFORM_LABELS[p.platform]}
+                  </p>
+                  <p className="line-clamp-1 text-[11px] text-muted-foreground">{p.caption}</p>
                 </div>
               </button>
             );
           })}
         </div>
-      )}
-
-      {selectedIndex !== null && (
-        <p className="mt-3 text-[11px] leading-snug text-muted-foreground">
-          Click a time slot on the calendar to schedule this post.
-        </p>
       )}
     </div>
   );
@@ -2373,6 +2423,7 @@ function CalendarView({
   onAssignQueuePost: (index: number, day: string, time: string) => void;
 }) {
   const [locked, setLocked] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
   const [previewPost, setPreviewPost] = useState<{
     day: string;
     date: number;
@@ -2381,6 +2432,7 @@ function CalendarView({
   } | null>(null);
   const days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
   return (
+    <TooltipProvider delayDuration={150}>
     <div className="px-8 py-8">
       <Header
         title="Smart Marketing Calendar"
@@ -2420,15 +2472,35 @@ function CalendarView({
       </button>
 
       <div className="mt-6 flex items-start gap-4">
-        <ApprovedQueueSidebar
-          queue={approvedQueue}
-          selectedIndex={selectedQueueIndex}
-          onSelect={onSelectQueuePost}
-        />
+        {sidebarCollapsed ? (
+          <div className="glass-card sticky top-20 flex w-14 shrink-0 flex-col items-center rounded-2xl p-2 transition-all duration-200">
+            <button
+              type="button"
+              onClick={() => setSidebarCollapsed(false)}
+              aria-label="Open Ready to Schedule"
+              className="relative grid h-10 w-10 place-items-center rounded-xl text-muted-foreground transition hover:bg-secondary/60 hover:text-foreground"
+            >
+              <PanelLeftOpen className="h-5 w-5" />
+              {approvedQueue.length > 0 && (
+                <span className="absolute -right-1 -top-1 grid h-4 min-w-[1rem] place-items-center rounded-full bg-primary px-1 text-[10px] font-semibold text-primary-foreground">
+                  {approvedQueue.length}
+                </span>
+              )}
+            </button>
+          </div>
+        ) : (
+          <ApprovedQueueSidebar
+            queue={approvedQueue}
+            selectedIndex={selectedQueueIndex}
+            onSelect={onSelectQueuePost}
+            onCollapse={() => setSidebarCollapsed(true)}
+          />
+        )}
 
         <div className="grid min-w-0 flex-1 grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-7">
           {days.map((d, i) => {
             const placing = selectedQueueIndex !== null;
+            const recommended = RECOMMENDED_SLOTS[d] ?? [];
             return (
               <div
                 key={d}
@@ -2485,18 +2557,46 @@ function CalendarView({
 
                   {placing ? (
                     <div className="max-h-40 space-y-1 overflow-y-auto pr-1">
-                      {TIME_SLOTS.map((time) => (
-                        <button
-                          key={time}
-                          type="button"
-                          data-slot-day={d}
-                          data-slot-time={time}
-                          onClick={() => onAssignQueuePost(selectedQueueIndex!, d, time)}
-                          className="flex w-full items-center gap-1.5 rounded-lg border border-border bg-secondary/20 px-2 py-1 text-left text-[11px] font-medium text-foreground/80 transition hover:border-primary/50 hover:bg-primary/10 hover:text-primary"
-                        >
-                          <Clock className="h-3 w-3" /> {time}
-                        </button>
-                      ))}
+                      {TIME_SLOTS.map((time) => {
+                        const rec = recommended.find((r) => r.time === time);
+                        const slotButton = (
+                          <button
+                            key={time}
+                            type="button"
+                            data-slot-day={d}
+                            data-slot-time={time}
+                            onClick={() => onAssignQueuePost(selectedQueueIndex!, d, time)}
+                            className={`w-full rounded-lg border px-2 py-1 text-left text-[11px] font-medium transition ${
+                              rec
+                                ? "border-primary/40 bg-primary/10 text-primary hover:bg-primary/20"
+                                : "border-border bg-secondary/20 text-foreground/80 hover:border-primary/50 hover:bg-primary/10 hover:text-primary"
+                            }`}
+                          >
+                            <span className="flex items-center justify-between">
+                              <span className="inline-flex items-center gap-1.5">
+                                <Clock className="h-3 w-3" /> {time}
+                              </span>
+                              {rec && <Sparkles className="h-3 w-3 text-primary" />}
+                            </span>
+                            {rec && (
+                              <span className="mt-0.5 block text-[9px] font-semibold uppercase tracking-wider text-primary/80">
+                                AI Recommended
+                              </span>
+                            )}
+                          </button>
+                        );
+
+                        if (!rec) return slotButton;
+
+                        return (
+                          <Tooltip key={time}>
+                            <TooltipTrigger asChild>{slotButton}</TooltipTrigger>
+                            <TooltipContent side="top" className="max-w-[220px] text-center">
+                              {rec.reason}
+                            </TooltipContent>
+                          </Tooltip>
+                        );
+                      })}
                     </div>
                   ) : (
                     <button
@@ -2527,6 +2627,7 @@ function CalendarView({
         }}
       />
     </div>
+    </TooltipProvider>
   );
 }
 
