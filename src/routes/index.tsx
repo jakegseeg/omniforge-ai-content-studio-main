@@ -2335,18 +2335,14 @@ function BoardFrame({
   frame,
   image,
   selected,
-  placing,
-  onSelect,
   onHeadline,
-  onDragStart,
+  onItemPointerDown,
 }: {
   frame: BoardFrameData;
   image: string;
   selected: boolean;
-  placing: boolean;
-  onSelect: () => void;
   onHeadline: (h: string) => void;
-  onDragStart: (e: React.PointerEvent) => void;
+  onItemPointerDown: (e: React.PointerEvent) => void;
 }) {
   const dispW = frame.w * DISPLAY_SCALE;
   const dispH = frame.h * DISPLAY_SCALE;
@@ -2354,13 +2350,7 @@ function BoardFrame({
     <div
       className="pointer-events-auto absolute cursor-move"
       style={{ left: frame.x, top: frame.y, width: dispW }}
-      onPointerDown={(e) => {
-        if (!placing) {
-          e.stopPropagation();
-          onSelect();
-          onDragStart(e);
-        }
-      }}
+      onPointerDown={onItemPointerDown}
     >
       {/* Title — left-aligned to the frame; purple in edit mode, black otherwise */}
       <div
@@ -2453,8 +2443,8 @@ function Composer({
       headline: seed?.title || "Your headline goes here",
     },
   ]);
-  // The selected frame is in edit mode; null = nothing selected.
-  const [selectedFrameId, setSelectedFrameId] = useState<string | null>("f1");
+  // Selection is a set of frame + object ids (Phase 2 multi-select).
+  const [selection, setSelection] = useState<string[]>(["f1"]);
   const [view, setView] = useState({ zoom: 1, x: 0, y: 0 });
   const [placing, setPlacing] = useState(false);
   const [ghost, setGhost] = useState<{ x: number; y: number } | null>(null);
@@ -2464,17 +2454,9 @@ function Composer({
   const [dockHidden, setDockHidden] = useState(false);
   const boardRef = useRef<HTMLDivElement>(null);
   const panRef = useRef<{ startX: number; startY: number; ox: number; oy: number } | null>(null);
-  const frameDragRef = useRef<{
-    id: string;
-    startX: number;
-    startY: number;
-    ox: number;
-    oy: number;
-  } | null>(null);
 
   // ----- Asset placement (Phase 1) -----
   const [objects, setObjects] = useState<BoardObject[]>([]);
-  const [selectedObjectId, setSelectedObjectId] = useState<string | null>(null);
   // Click-to-place: an asset is "armed" and waiting for a canvas click.
   const [armed, setArmed] = useState<{ image: string; type: string } | null>(null);
   // Fill/Fit/Place-Freely modal for media dropped on a frame.
@@ -2489,13 +2471,34 @@ function Composer({
   // Editable zoom indicator.
   const [zoomEditing, setZoomEditing] = useState(false);
   const [zoomInput, setZoomInput] = useState("");
-  const objDragRef = useRef<{
-    id: string;
+
+  // ----- Phase 2: multi-select, marquee, context menu -----
+  const [lockedIds, setLockedIds] = useState<string[]>([]);
+  const [clipboard, setClipboard] = useState<{
+    frames: BoardFrameData[];
+    objects: BoardObject[];
+  } | null>(null);
+  const [marquee, setMarquee] = useState<{ x0: number; y0: number; x1: number; y1: number } | null>(
+    null,
+  );
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
+  const spaceRef = useRef(false);
+  const marqueeRef = useRef<{ x0: number; y0: number; base: string[] } | null>(null);
+  // Group drag: moves every selected frame/object together.
+  const groupDragRef = useRef<{
+    items: { id: string; kind: "frame" | "object"; ox: number; oy: number }[];
     startX: number;
     startY: number;
-    ox: number;
-    oy: number;
   } | null>(null);
+
+  const isSel = (id: string) => selection.includes(id);
+  const toggleSel = (id: string) =>
+    setSelection((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]));
+  // Latest selection for keyboard handlers (which capture an empty-deps closure).
+  const selectionRef = useRef<string[]>(selection);
+  useEffect(() => {
+    selectionRef.current = selection;
+  }, [selection]);
 
   // Fit the first frame into view on mount.
   useEffect(() => {
@@ -2531,16 +2534,37 @@ function Composer({
     return () => el.removeEventListener("wheel", onWheel);
   }, []);
 
-  // Escape cancels an armed asset or an open placement modal.
+  // Keyboard: Escape cancels/deselects, Space enables panning, Delete removes selection.
   useEffect(() => {
+    const typing = (t: EventTarget | null) => {
+      const el = t as HTMLElement | null;
+      return el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA");
+    };
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         setArmed(null);
         setPlacePrompt(null);
+        setContextMenu(null);
+        setSelection([]);
+      }
+      if (e.code === "Space" && !typing(e.target)) {
+        spaceRef.current = true;
+      }
+      if ((e.key === "Delete" || e.key === "Backspace") && !typing(e.target)) {
+        setFrames((fs) => fs.filter((f) => !selectionRef.current.includes(f.id)));
+        setObjects((os) => os.filter((o) => !selectionRef.current.includes(o.id)));
+        setSelection([]);
       }
     };
+    const onUp = (e: KeyboardEvent) => {
+      if (e.code === "Space") spaceRef.current = false;
+    };
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    window.addEventListener("keyup", onUp);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      window.removeEventListener("keyup", onUp);
+    };
   }, []);
 
   // ----- Placement helpers (behavior per asset-behavior-matrix-2026.md) -----
@@ -2570,8 +2594,7 @@ function Composer({
     const { w, h } = objSize(type);
     const id = "o" + Date.now() + Math.random().toString(36).slice(2, 6);
     setObjects((os) => [...os, { id, x: cx - w / 2, y: cy - h / 2, w, h, image, overlay }]);
-    setSelectedObjectId(id);
-    setSelectedFrameId(null);
+    setSelection([id]);
   };
   const setFrameContent = (frameId: string, image: string, fit: "fill" | "fit") =>
     setFrames((fs) => fs.map((f) => (f.id === frameId ? { ...f, content: { image, fit } } : f)));
@@ -2642,9 +2665,42 @@ function Composer({
     }));
   };
 
+  // ----- Selection + group drag (Phase 2) -----
+  const startGroupDrag = (ids: string[], e: React.PointerEvent) => {
+    const items = ids
+      .filter((id) => !lockedIds.includes(id))
+      .map((id) => {
+        const f = frames.find((x) => x.id === id);
+        if (f) return { id, kind: "frame" as const, ox: f.x, oy: f.y };
+        const o = objects.find((x) => x.id === id)!;
+        return { id, kind: "object" as const, ox: o.x, oy: o.y };
+      });
+    if (!items.length) return;
+    groupDragRef.current = { items, startX: e.clientX, startY: e.clientY };
+    boardRef.current?.setPointerCapture(e.pointerId);
+  };
+  // Pointer-down on any frame/object: resolve selection, then start a (group) drag.
+  const onItemPointerDown = (id: string, e: React.PointerEvent) => {
+    if (placing || armed) return; // board handles placement clicks
+    e.stopPropagation();
+    setContextMenu(null);
+    setOpenPlatform(null);
+    if (e.shiftKey) {
+      toggleSel(id);
+      return; // shift-click toggles membership, no drag
+    }
+    const sel = selection.includes(id) ? selection : [id];
+    if (!selection.includes(id)) setSelection([id]);
+    startGroupDrag(sel, e);
+  };
+
   const boardPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     const el = boardRef.current;
     if (!el) return;
+    if (contextMenu) {
+      setContextMenu(null);
+      return;
+    }
     // Clicking outside an open size dropdown just closes it; edit mode stays on.
     if (openPlatform) {
       setOpenPlatform(null);
@@ -2676,63 +2732,67 @@ function Composer({
           headline: "Your headline goes here",
         },
       ]);
-      setSelectedFrameId(id);
+      setSelection([id]);
       setPlacing(false);
       setGhost(null);
       return;
     }
-    // Empty-space click: deselect and start panning.
-    setSelectedFrameId(null);
-    setSelectedObjectId(null);
-    setPanning(true);
-    panRef.current = { startX: e.clientX, startY: e.clientY, ox: view.x, oy: view.y };
+    // Hold Space to pan; otherwise an empty-space drag draws a marquee selection.
+    if (spaceRef.current) {
+      setPanning(true);
+      panRef.current = { startX: e.clientX, startY: e.clientY, ox: view.x, oy: view.y };
+      el.setPointerCapture(e.pointerId);
+      return;
+    }
+    const sx = e.clientX - r.left;
+    const sy = e.clientY - r.top;
+    const base = e.shiftKey ? [...selection] : [];
+    if (!e.shiftKey) setSelection([]);
+    marqueeRef.current = { x0: sx, y0: sy, base };
+    setMarquee({ x0: sx, y0: sy, x1: sx, y1: sy });
     el.setPointerCapture(e.pointerId);
-  };
-  // Begin dragging a frame (pointer is captured on the board so fast drags don't escape).
-  const onFrameDragStart = (frame: BoardFrameData, e: React.PointerEvent) => {
-    setSelectedObjectId(null);
-    frameDragRef.current = {
-      id: frame.id,
-      startX: e.clientX,
-      startY: e.clientY,
-      ox: frame.x,
-      oy: frame.y,
-    };
-    boardRef.current?.setPointerCapture(e.pointerId);
-  };
-  const onObjectDragStart = (obj: BoardObject, e: React.PointerEvent) => {
-    setSelectedObjectId(obj.id);
-    setSelectedFrameId(null);
-    objDragRef.current = {
-      id: obj.id,
-      startX: e.clientX,
-      startY: e.clientY,
-      ox: obj.x,
-      oy: obj.y,
-    };
-    boardRef.current?.setPointerCapture(e.pointerId);
   };
   const boardPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
     const el = boardRef.current;
     if (!el) return;
     const r = el.getBoundingClientRect();
     if (placing) setGhost({ x: e.clientX - r.left, y: e.clientY - r.top });
-    const od = objDragRef.current;
-    if (od) {
-      const dx = (e.clientX - od.startX) / view.zoom;
-      const dy = (e.clientY - od.startY) / view.zoom;
+    const gd = groupDragRef.current;
+    if (gd) {
+      const dx = (e.clientX - gd.startX) / view.zoom;
+      const dy = (e.clientY - gd.startY) / view.zoom;
+      const m = new Map(gd.items.map((it) => [it.id, it]));
+      setFrames((fs) =>
+        fs.map((f) =>
+          m.has(f.id) ? { ...f, x: m.get(f.id)!.ox + dx, y: m.get(f.id)!.oy + dy } : f,
+        ),
+      );
       setObjects((os) =>
-        os.map((o) => (o.id === od.id ? { ...o, x: od.ox + dx, y: od.oy + dy } : o)),
+        os.map((o) =>
+          m.has(o.id) ? { ...o, x: m.get(o.id)!.ox + dx, y: m.get(o.id)!.oy + dy } : o,
+        ),
       );
       return;
     }
-    const fd = frameDragRef.current;
-    if (fd) {
-      const dx = (e.clientX - fd.startX) / view.zoom;
-      const dy = (e.clientY - fd.startY) / view.zoom;
-      setFrames((fs) =>
-        fs.map((f) => (f.id === fd.id ? { ...f, x: fd.ox + dx, y: fd.oy + dy } : f)),
-      );
+    const mq = marqueeRef.current;
+    if (mq) {
+      const x1 = e.clientX - r.left;
+      const y1 = e.clientY - r.top;
+      setMarquee({ x0: mq.x0, y0: mq.y0, x1, y1 });
+      const wx0 = (Math.min(mq.x0, x1) - view.x) / view.zoom;
+      const wy0 = (Math.min(mq.y0, y1) - view.y) / view.zoom;
+      const wx1 = (Math.max(mq.x0, x1) - view.x) / view.zoom;
+      const wy1 = (Math.max(mq.y0, y1) - view.y) / view.zoom;
+      const hits: string[] = [];
+      frames.forEach((f) => {
+        const dw = f.w * DISPLAY_SCALE;
+        const dh = f.h * DISPLAY_SCALE;
+        if (f.x < wx1 && f.x + dw > wx0 && f.y < wy1 && f.y + dh > wy0) hits.push(f.id);
+      });
+      objects.forEach((o) => {
+        if (o.x < wx1 && o.x + o.w > wx0 && o.y < wy1 && o.y + o.h > wy0) hits.push(o.id);
+      });
+      setSelection([...new Set([...mq.base, ...hits])]);
       return;
     }
     const p = panRef.current;
@@ -2744,9 +2804,10 @@ function Composer({
       }));
   };
   const boardPointerUp = () => {
-    frameDragRef.current = null;
-    objDragRef.current = null;
+    groupDragRef.current = null;
     panRef.current = null;
+    marqueeRef.current = null;
+    setMarquee(null);
     setPanning(false);
   };
   // ----- "Select to Send" panel -----
@@ -2755,6 +2816,105 @@ function Composer({
   const [editOpen, setEditOpen] = useState(false);
   const [checkedFrames, setCheckedFrames] = useState<string[]>([]);
   const [uploadedVideo, setUploadedVideo] = useState<string | null>(null);
+
+  // ----- Context menu (Phase 2) — actions operate on the current selection -----
+  const uid = (p: string) => p + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+  const openContextMenu = (e: React.MouseEvent) => {
+    e.preventDefault();
+    const el = boardRef.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    const { wx, wy } = toWorld(e.clientX, e.clientY);
+    const frame = hitFrame(wx, wy);
+    const obj = frame
+      ? null
+      : [...objects]
+          .reverse()
+          .find((o) => wx >= o.x && wx <= o.x + o.w && wy >= o.y && wy <= o.y + o.h);
+    const hitId = frame?.id ?? obj?.id ?? null;
+    if (hitId && !selection.includes(hitId)) setSelection([hitId]);
+    if (!hitId && selection.length === 0) return;
+    setContextMenu({ x: e.clientX - r.left, y: e.clientY - r.top });
+  };
+  const selectedFrameIds = () => selection.filter((id) => frames.some((f) => f.id === id));
+  const cmDelete = () => {
+    setFrames((fs) => fs.filter((f) => !selection.includes(f.id)));
+    setObjects((os) => os.filter((o) => !selection.includes(o.id)));
+    setSelection([]);
+    setContextMenu(null);
+  };
+  const cmCopy = () => {
+    setClipboard({
+      frames: frames.filter((f) => selection.includes(f.id)),
+      objects: objects.filter((o) => selection.includes(o.id)),
+    });
+    setContextMenu(null);
+  };
+  const cmDuplicate = () => {
+    const nf = frames
+      .filter((f) => selection.includes(f.id))
+      .map((f) => ({ ...f, id: uid("f"), x: f.x + 24, y: f.y + 24 }));
+    const no = objects
+      .filter((o) => selection.includes(o.id))
+      .map((o) => ({ ...o, id: uid("o"), x: o.x + 24, y: o.y + 24 }));
+    setFrames((fs) => [...fs, ...nf]);
+    setObjects((os) => [...os, ...no]);
+    setSelection([...nf.map((f) => f.id), ...no.map((o) => o.id)]);
+    setContextMenu(null);
+  };
+  const cmPaste = () => {
+    if (!clipboard) return;
+    const nf = clipboard.frames.map((f) => ({ ...f, id: uid("f"), x: f.x + 24, y: f.y + 24 }));
+    const no = clipboard.objects.map((o) => ({ ...o, id: uid("o"), x: o.x + 24, y: o.y + 24 }));
+    setFrames((fs) => [...fs, ...nf]);
+    setObjects((os) => [...os, ...no]);
+    setSelection([...nf.map((f) => f.id), ...no.map((o) => o.id)]);
+    setContextMenu(null);
+  };
+  const cmCut = () => {
+    cmCopy();
+    cmDelete();
+  };
+  const cmForward = () => {
+    setFrames((fs) => [
+      ...fs.filter((f) => !selection.includes(f.id)),
+      ...fs.filter((f) => selection.includes(f.id)),
+    ]);
+    setObjects((os) => [
+      ...os.filter((o) => !selection.includes(o.id)),
+      ...os.filter((o) => selection.includes(o.id)),
+    ]);
+    setContextMenu(null);
+  };
+  const cmBackward = () => {
+    setFrames((fs) => [
+      ...fs.filter((f) => selection.includes(f.id)),
+      ...fs.filter((f) => !selection.includes(f.id)),
+    ]);
+    setObjects((os) => [
+      ...os.filter((o) => selection.includes(o.id)),
+      ...os.filter((o) => !selection.includes(o.id)),
+    ]);
+    setContextMenu(null);
+  };
+  const cmLock = () => {
+    setLockedIds((l) => [...new Set([...l, ...selection])]);
+    setContextMenu(null);
+  };
+  const cmUnlock = () => {
+    setLockedIds((l) => l.filter((id) => !selection.includes(id)));
+    setContextMenu(null);
+  };
+  const cmSendToPost = () => {
+    const fIds = selectedFrameIds();
+    setContextMenu(null);
+    if (!fIds.length) {
+      toast.error("Select at least one frame to send");
+      return;
+    }
+    setCheckedFrames((c) => [...new Set([...c, ...fIds])]);
+    toast.success(`${fIds.length} frame${fIds.length > 1 ? "s" : ""} added to Select to Send`);
+  };
 
   // Ideas card (collapsible AI Idea Engine)
   const [ideasOpen, setIdeasOpen] = useState(false);
@@ -3104,6 +3264,7 @@ function Composer({
             onPointerDown={boardPointerDown}
             onPointerMove={boardPointerMove}
             onPointerUp={boardPointerUp}
+            onContextMenu={openContextMenu}
             onDragOver={(e) => {
               e.preventDefault();
               e.dataTransfer.dropEffect = "copy";
@@ -3114,7 +3275,10 @@ function Composer({
               if (img) placeAssetAt(img, openCategory ?? "Photos", e.clientX, e.clientY);
             }}
             className="relative min-h-[420px] flex-1 overflow-hidden rounded-2xl lg:min-h-0"
-            style={{ cursor: placing || armed ? "crosshair" : "grab", touchAction: "none" }}
+            style={{
+              cursor: placing || armed ? "crosshair" : panning ? "grabbing" : "default",
+              touchAction: "none",
+            }}
           >
             {/* World — pans and zooms; frames and placed objects live in its space */}
             <div
@@ -3129,16 +3293,11 @@ function Composer({
                   key={f.id}
                   frame={f}
                   image={selectedAsset}
-                  selected={selectedFrameId === f.id}
-                  placing={placing}
-                  onSelect={() => {
-                    setSelectedFrameId(f.id);
-                    setOpenPlatform(null);
-                  }}
+                  selected={isSel(f.id)}
                   onHeadline={(h) =>
                     setFrames((fs) => fs.map((x) => (x.id === f.id ? { ...x, headline: h } : x)))
                   }
-                  onDragStart={(e) => onFrameDragStart(f, e)}
+                  onItemPointerDown={(e) => onItemPointerDown(f.id, e)}
                 />
               ))}
 
@@ -3147,14 +3306,10 @@ function Composer({
                 <div
                   key={o.id}
                   className={`pointer-events-auto absolute cursor-move overflow-hidden rounded-md ${
-                    selectedObjectId === o.id ? "ring-2 ring-blue-500" : ""
-                  }`}
+                    isSel(o.id) ? "ring-2 ring-blue-500" : ""
+                  } ${lockedIds.includes(o.id) ? "opacity-90" : ""}`}
                   style={{ left: o.x, top: o.y, width: o.w, height: o.h }}
-                  onPointerDown={(e) => {
-                    if (placing || armed) return;
-                    e.stopPropagation();
-                    onObjectDragStart(o, e);
-                  }}
+                  onPointerDown={(e) => onItemPointerDown(o.id, e)}
                 >
                   <img
                     src={o.image}
@@ -3164,7 +3319,22 @@ function Composer({
                   />
                 </div>
               ))}
+
+              {/* Marquee selection box (rendered in screen space via the world's inverse) */}
             </div>
+
+            {/* Marquee selection rectangle (screen space) */}
+            {marquee && (
+              <div
+                className="pointer-events-none absolute rounded-sm border border-blue-500 bg-blue-500/10"
+                style={{
+                  left: Math.min(marquee.x0, marquee.x1),
+                  top: Math.min(marquee.y0, marquee.y1),
+                  width: Math.abs(marquee.x1 - marquee.x0),
+                  height: Math.abs(marquee.y1 - marquee.y0),
+                }}
+              />
+            )}
 
             {/* Ghost frame trailing the cursor while placing (CapCut-style + badge) */}
             {placing && ghost && (
@@ -3187,7 +3357,8 @@ function Composer({
                 Rendered in screen space so it stays a constant size (font/size don't
                 shrink on zoom); its position tracks the frame through pan/zoom/drag. */}
             {(() => {
-              const sf = frames.find((f) => f.id === selectedFrameId);
+              // Only show the per-frame toolbar when exactly one frame is selected.
+              const sf = selection.length === 1 ? frames.find((f) => f.id === selection[0]) : null;
               if (!sf) return null;
               const barX = view.x + (sf.x + (sf.w * DISPLAY_SCALE) / 2) * view.zoom;
               const barY = view.y + sf.y * view.zoom - 8;
@@ -3293,6 +3464,58 @@ function Composer({
               )}
             </div>
 
+            {/* Right-click context menu (screen space) */}
+            {contextMenu && (
+              <div
+                onPointerDown={(e) => e.stopPropagation()}
+                onContextMenu={(e) => e.preventDefault()}
+                className="absolute z-40 w-44 rounded-xl border border-border bg-popover p-1 text-sm text-popover-foreground shadow-xl"
+                style={{
+                  left: Math.min(contextMenu.x, 9999),
+                  top: contextMenu.y,
+                  cursor: "default",
+                }}
+              >
+                {(
+                  [
+                    ["Cut", cmCut],
+                    ["Copy", cmCopy],
+                    ["Paste", cmPaste],
+                    ["Duplicate", cmDuplicate],
+                    ["Delete", cmDelete],
+                    ["divider"],
+                    ["Group", () => toast("Group — coming soon")],
+                    ["Ungroup", () => toast("Ungroup — coming soon")],
+                    ["Lock", cmLock],
+                    ["Unlock", cmUnlock],
+                    ["divider"],
+                    ["Bring Forward", cmForward],
+                    ["Send Backward", cmBackward],
+                    ["Align", () => toast("Align — coming soon")],
+                    ["Distribute", () => toast("Distribute — coming soon")],
+                    ["Rename", () => toast("Rename — coming soon")],
+                    ["divider"],
+                    ["Send to Post", cmSendToPost],
+                  ] as [string, (() => void)?][]
+                ).map(([label, action], i) =>
+                  label === "divider" ? (
+                    <div key={i} className="my-1 h-px bg-border" />
+                  ) : (
+                    <button
+                      key={label}
+                      onClick={action}
+                      disabled={label === "Paste" && !clipboard}
+                      className={`flex w-full items-center justify-between rounded-lg px-2.5 py-1.5 text-left transition hover:bg-muted disabled:opacity-40 ${
+                        label === "Send to Post" ? "font-semibold text-primary" : ""
+                      } ${label === "Delete" ? "text-rose-600 dark:text-rose-300" : ""}`}
+                    >
+                      {label}
+                    </button>
+                  ),
+                )}
+              </div>
+            )}
+
             {/* Lower editing toolbar with collapsible dock */}
             <div
               onPointerDown={(e) => e.stopPropagation()}
@@ -3314,7 +3537,7 @@ function Composer({
                       t.label === "Frame"
                         ? () => {
                             setPlacing((p) => !p);
-                            setSelectedFrameId(null);
+                            setSelection([]);
                           }
                         : undefined
                     }
