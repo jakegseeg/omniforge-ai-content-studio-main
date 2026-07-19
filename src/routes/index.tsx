@@ -2299,7 +2299,8 @@ type BoardFrameData = {
   w: number; // real px width
   h: number; // real px height
   headline: string;
-  content?: { image: string; fit: "fill" | "fit" }; // asset placed into this frame
+  // Asset placed into this frame; ox/oy/scale reposition & zoom it in content-edit mode.
+  content?: { image: string; fit: "fill" | "fit"; ox?: number; oy?: number; scale?: number };
 };
 
 // A free asset placed on the board (photo dropped on empty space, or an
@@ -2335,22 +2336,33 @@ function BoardFrame({
   frame,
   image,
   selected,
+  editing,
   onHeadline,
   onItemPointerDown,
+  onEnterEdit,
+  onContentPointerDown,
 }: {
   frame: BoardFrameData;
   image: string;
   selected: boolean;
+  editing: boolean;
   onHeadline: (h: string) => void;
   onItemPointerDown: (e: React.PointerEvent) => void;
+  onEnterEdit: () => void;
+  onContentPointerDown: (e: React.PointerEvent) => void;
 }) {
   const dispW = frame.w * DISPLAY_SCALE;
   const dispH = frame.h * DISPLAY_SCALE;
+  const c = frame.content;
+  const contentTransform = c
+    ? `translate(${c.ox ?? 0}px, ${c.oy ?? 0}px) scale(${c.scale ?? 1})`
+    : undefined;
   return (
     <div
       className="pointer-events-auto absolute cursor-move"
       style={{ left: frame.x, top: frame.y, width: dispW }}
       onPointerDown={onItemPointerDown}
+      onDoubleClick={onEnterEdit}
     >
       {/* Title — left-aligned to the frame; purple in edit mode, black otherwise */}
       <div
@@ -2363,37 +2375,55 @@ function BoardFrame({
 
       <div
         className={`relative rounded-[18px] ${
-          selected ? "ring-2 ring-blue-500 ring-offset-2 ring-offset-muted" : ""
+          editing
+            ? "ring-2 ring-primary ring-offset-2 ring-offset-muted"
+            : selected
+              ? "ring-2 ring-blue-500 ring-offset-2 ring-offset-muted"
+              : ""
         }`}
         style={{ width: dispW, height: dispH }}
       >
         <div className="absolute inset-0 overflow-hidden rounded-[16px] shadow-[0_14px_30px_rgba(0,0,0,0.2)]">
-          {frame.content ? (
+          {c ? (
             <>
               <div className="absolute inset-0 bg-muted" />
               <img
-                src={frame.content.image}
+                src={c.image}
                 alt=""
+                style={{ transform: contentTransform }}
                 className={`absolute inset-0 h-full w-full ${
-                  frame.content.fit === "fill" ? "object-cover" : "object-contain"
+                  c.fit === "fill" ? "object-cover" : "object-contain"
                 }`}
               />
+              {/* In content-edit mode a drag layer moves the image within the clip. */}
+              {editing && (
+                <div
+                  onPointerDown={onContentPointerDown}
+                  className="absolute inset-0 cursor-move"
+                  style={{ touchAction: "none" }}
+                />
+              )}
             </>
           ) : (
             <img src={image} alt="" className="absolute inset-0 h-full w-full object-cover" />
           )}
-          <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-white/10" />
-          <div className="absolute inset-x-4 bottom-[8%]">
-            <textarea
-              value={frame.headline}
-              onChange={(e) => onHeadline(e.target.value)}
-              onPointerDown={(e) => e.stopPropagation()}
-              rows={2}
-              className="w-full resize-none rounded-xl border border-white/30 bg-black/35 p-2.5 text-center text-xl font-black leading-tight text-white outline-none backdrop-blur-md focus:border-primary"
-            />
-          </div>
+          {!editing && (
+            <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-white/10" />
+          )}
+          {!editing && (
+            <div className="absolute inset-x-4 bottom-[8%]">
+              <textarea
+                value={frame.headline}
+                onChange={(e) => onHeadline(e.target.value)}
+                onPointerDown={(e) => e.stopPropagation()}
+                rows={2}
+                className="w-full resize-none rounded-xl border border-white/30 bg-black/35 p-2.5 text-center text-xl font-black leading-tight text-white outline-none backdrop-blur-md focus:border-primary"
+              />
+            </div>
+          )}
         </div>
         {selected &&
+          !editing &&
           SELECTION_HANDLES.map((pos) => (
             <span
               key={pos}
@@ -2468,6 +2498,11 @@ function Composer({
   const [rememberChoice, setRememberChoice] = useState(false);
   const [placeDefaults, setPlaceDefaults] = useState<Record<string, "fill" | "fit" | "free">>({});
   const [panning, setPanning] = useState(false);
+  // Space held → show the hand/grab cursor (Figma-style pan mode).
+  const [spaceHeld, setSpaceHeld] = useState(false);
+  // Brief ease only for the editable-zoom jump (not for continuous wheel/drag).
+  const [animating, setAnimating] = useState(false);
+  const animTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Editable zoom indicator.
   const [zoomEditing, setZoomEditing] = useState(false);
   const [zoomInput, setZoomInput] = useState("");
@@ -2489,6 +2524,30 @@ function Composer({
     items: { id: string; kind: "frame" | "object"; ox: number; oy: number }[];
     startX: number;
     startY: number;
+  } | null>(null);
+
+  // ----- Phase 3: frame content-edit mode + object resize -----
+  const [editingFrameId, setEditingFrameId] = useState<string | null>(null);
+  const editingRef = useRef<string | null>(null);
+  useEffect(() => {
+    editingRef.current = editingFrameId;
+  }, [editingFrameId]);
+  const contentDragRef = useRef<{
+    frameId: string;
+    startX: number;
+    startY: number;
+    ox: number;
+    oy: number;
+  } | null>(null);
+  const resizeRef = useRef<{
+    id: string;
+    corner: "tl" | "tr" | "bl" | "br";
+    startX: number;
+    startY: number;
+    ox: number;
+    oy: number;
+    ow: number;
+    oh: number;
   } | null>(null);
 
   const isSel = (id: string) => selection.includes(id);
@@ -2514,21 +2573,31 @@ function Composer({
     });
   }, []);
 
-  // Zoom to cursor with the mouse wheel (native listener so we can preventDefault).
+  // Figma/CapCut-style wheel: pinch or Ctrl+wheel zooms to cursor; a plain
+  // trackpad two-finger swipe / mouse wheel pans the board.
   useEffect(() => {
     const el = boardRef.current;
     if (!el) return;
     const onWheel = (e: WheelEvent) => {
       e.preventDefault();
       const r = el.getBoundingClientRect();
-      const mx = e.clientX - r.left;
-      const my = e.clientY - r.top;
-      setView((v) => {
-        // Gentler than before (1.06 vs 1.1) so zoom is slower and more precise.
-        const factor = e.deltaY < 0 ? 1.06 : 1 / 1.06;
-        const nz = Math.min(3, Math.max(0.2, v.zoom * factor));
-        return { zoom: nz, x: mx - (mx - v.x) * (nz / v.zoom), y: my - (my - v.y) * (nz / v.zoom) };
-      });
+      if (e.ctrlKey) {
+        const mx = e.clientX - r.left;
+        const my = e.clientY - r.top;
+        setView((v) => {
+          // Gentle continuous zoom (works for both pinch and Ctrl+wheel).
+          const factor = Math.pow(1.0015, -e.deltaY);
+          const nz = Math.min(3, Math.max(0.2, v.zoom * factor));
+          return {
+            zoom: nz,
+            x: mx - (mx - v.x) * (nz / v.zoom),
+            y: my - (my - v.y) * (nz / v.zoom),
+          };
+        });
+      } else {
+        // Two-finger swipe / scroll → pan.
+        setView((v) => ({ ...v, x: v.x - e.deltaX, y: v.y - e.deltaY }));
+      }
     };
     el.addEventListener("wheel", onWheel, { passive: false });
     return () => el.removeEventListener("wheel", onWheel);
@@ -2545,10 +2614,13 @@ function Composer({
         setArmed(null);
         setPlacePrompt(null);
         setContextMenu(null);
-        setSelection([]);
+        if (editingRef.current) setEditingFrameId(null);
+        else setSelection([]);
       }
       if (e.code === "Space" && !typing(e.target)) {
+        e.preventDefault(); // don't scroll the page
         spaceRef.current = true;
+        setSpaceHeld(true);
       }
       if ((e.key === "Delete" || e.key === "Backspace") && !typing(e.target)) {
         setFrames((fs) => fs.filter((f) => !selectionRef.current.includes(f.id)));
@@ -2557,7 +2629,10 @@ function Composer({
       }
     };
     const onUp = (e: KeyboardEvent) => {
-      if (e.code === "Space") spaceRef.current = false;
+      if (e.code === "Space") {
+        spaceRef.current = false;
+        setSpaceHeld(false);
+      }
     };
     window.addEventListener("keydown", onKey);
     window.addEventListener("keyup", onUp);
@@ -2658,6 +2733,10 @@ function Composer({
     const r = el.getBoundingClientRect();
     const mx = r.width / 2;
     const my = r.height / 2;
+    // Ease this discrete jump smoothly.
+    setAnimating(true);
+    if (animTimer.current) clearTimeout(animTimer.current);
+    animTimer.current = setTimeout(() => setAnimating(false), 220);
     setView((v) => ({
       zoom: nz,
       x: mx - (mx - v.x) * (nz / v.zoom),
@@ -2682,6 +2761,9 @@ function Composer({
   // Pointer-down on any frame/object: resolve selection, then start a (group) drag.
   const onItemPointerDown = (id: string, e: React.PointerEvent) => {
     if (placing || armed) return; // board handles placement clicks
+    if (e.button === 1 || spaceRef.current) return; // let the board pan instead
+    // In content-edit mode, clicking the edited frame reposition its content.
+    if (editingFrameId === id) return;
     e.stopPropagation();
     setContextMenu(null);
     setOpenPlatform(null);
@@ -2692,6 +2774,58 @@ function Composer({
     const sel = selection.includes(id) ? selection : [id];
     if (!selection.includes(id)) setSelection([id]);
     startGroupDrag(sel, e);
+  };
+  // Double-click a populated frame → content-edit mode (reposition/scale inside).
+  const enterContentEdit = (id: string) => {
+    const f = frames.find((x) => x.id === id);
+    if (!f?.content) return;
+    setSelection([id]);
+    setOpenPlatform(null);
+    setEditingFrameId(id);
+  };
+  const onContentDragStart = (frame: BoardFrameData, e: React.PointerEvent) => {
+    e.stopPropagation();
+    contentDragRef.current = {
+      frameId: frame.id,
+      startX: e.clientX,
+      startY: e.clientY,
+      ox: frame.content?.ox ?? 0,
+      oy: frame.content?.oy ?? 0,
+    };
+    boardRef.current?.setPointerCapture(e.pointerId);
+  };
+  const scaleContent = (frameId: string, delta: number) =>
+    setFrames((fs) =>
+      fs.map((f) =>
+        f.id === frameId && f.content
+          ? {
+              ...f,
+              content: {
+                ...f.content,
+                scale: Math.min(4, Math.max(0.2, (f.content.scale ?? 1) + delta)),
+              },
+            }
+          : f,
+      ),
+    );
+  // Resize a placed object by dragging a corner (opposite corner stays fixed).
+  const onObjectResizeStart = (
+    obj: BoardObject,
+    corner: "tl" | "tr" | "bl" | "br",
+    e: React.PointerEvent,
+  ) => {
+    e.stopPropagation();
+    resizeRef.current = {
+      id: obj.id,
+      corner,
+      startX: e.clientX,
+      startY: e.clientY,
+      ox: obj.x,
+      oy: obj.y,
+      ow: obj.w,
+      oh: obj.h,
+    };
+    boardRef.current?.setPointerCapture(e.pointerId);
   };
 
   const boardPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
@@ -2737,8 +2871,14 @@ function Composer({
       setGhost(null);
       return;
     }
-    // Hold Space to pan; otherwise an empty-space drag draws a marquee selection.
-    if (spaceRef.current) {
+    // Clicking empty space while editing frame content commits and exits.
+    if (editingFrameId) {
+      setEditingFrameId(null);
+      return;
+    }
+    // Hold Space (or use the middle mouse button) to pan; otherwise an
+    // empty-space drag draws a marquee selection.
+    if (spaceRef.current || e.button === 1) {
       setPanning(true);
       panRef.current = { startX: e.clientX, startY: e.clientY, ox: view.x, oy: view.y };
       el.setPointerCapture(e.pointerId);
@@ -2757,6 +2897,60 @@ function Composer({
     if (!el) return;
     const r = el.getBoundingClientRect();
     if (placing) setGhost({ x: e.clientX - r.left, y: e.clientY - r.top });
+    // Repositioning a frame's content in content-edit mode.
+    const cd = contentDragRef.current;
+    if (cd) {
+      const dx = (e.clientX - cd.startX) / view.zoom;
+      const dy = (e.clientY - cd.startY) / view.zoom;
+      setFrames((fs) =>
+        fs.map((f) =>
+          f.id === cd.frameId && f.content
+            ? { ...f, content: { ...f.content, ox: cd.ox + dx, oy: cd.oy + dy } }
+            : f,
+        ),
+      );
+      return;
+    }
+    // Resizing a placed object by a corner handle.
+    const rz = resizeRef.current;
+    if (rz) {
+      const dx = (e.clientX - rz.startX) / view.zoom;
+      const dy = (e.clientY - rz.startY) / view.zoom;
+      let nx = rz.ox;
+      let ny = rz.oy;
+      let nw = rz.ow;
+      let nh = rz.oh;
+      if (rz.corner === "br") {
+        nw = rz.ow + dx;
+        nh = rz.oh + dy;
+      } else if (rz.corner === "tr") {
+        nw = rz.ow + dx;
+        nh = rz.oh - dy;
+        ny = rz.oy + dy;
+      } else if (rz.corner === "bl") {
+        nw = rz.ow - dx;
+        nh = rz.oh + dy;
+        nx = rz.ox + dx;
+      } else {
+        nw = rz.ow - dx;
+        nh = rz.oh - dy;
+        nx = rz.ox + dx;
+        ny = rz.oy + dy;
+      }
+      const MIN = 24;
+      if (nw < MIN) {
+        if (rz.corner === "tl" || rz.corner === "bl") nx = rz.ox + rz.ow - MIN;
+        nw = MIN;
+      }
+      if (nh < MIN) {
+        if (rz.corner === "tl" || rz.corner === "tr") ny = rz.oy + rz.oh - MIN;
+        nh = MIN;
+      }
+      setObjects((os) =>
+        os.map((o) => (o.id === rz.id ? { ...o, x: nx, y: ny, w: nw, h: nh } : o)),
+      );
+      return;
+    }
     const gd = groupDragRef.current;
     if (gd) {
       const dx = (e.clientX - gd.startX) / view.zoom;
@@ -2807,6 +3001,8 @@ function Composer({
     groupDragRef.current = null;
     panRef.current = null;
     marqueeRef.current = null;
+    contentDragRef.current = null;
+    resizeRef.current = null;
     setMarquee(null);
     setPanning(false);
   };
@@ -3276,7 +3472,14 @@ function Composer({
             }}
             className="relative min-h-[420px] flex-1 overflow-hidden rounded-2xl lg:min-h-0"
             style={{
-              cursor: placing || armed ? "crosshair" : panning ? "grabbing" : "default",
+              cursor:
+                placing || armed
+                  ? "crosshair"
+                  : panning
+                    ? "grabbing"
+                    : spaceHeld
+                      ? "grab"
+                      : "default",
               touchAction: "none",
             }}
           >
@@ -3285,7 +3488,7 @@ function Composer({
               className="pointer-events-none absolute left-0 top-0 origin-top-left"
               style={{
                 transform: `translate(${view.x}px, ${view.y}px) scale(${view.zoom})`,
-                transition: panning ? "none" : "transform 140ms ease-out",
+                transition: animating ? "transform 160ms ease-out" : "none",
               }}
             >
               {frames.map((f) => (
@@ -3294,31 +3497,59 @@ function Composer({
                   frame={f}
                   image={selectedAsset}
                   selected={isSel(f.id)}
+                  editing={editingFrameId === f.id}
                   onHeadline={(h) =>
                     setFrames((fs) => fs.map((x) => (x.id === f.id ? { ...x, headline: h } : x)))
                   }
                   onItemPointerDown={(e) => onItemPointerDown(f.id, e)}
+                  onEnterEdit={() => enterContentEdit(f.id)}
+                  onContentPointerDown={(e) => onContentDragStart(f, e)}
                 />
               ))}
 
               {/* Placed assets (free objects / overlays) */}
-              {objects.map((o) => (
-                <div
-                  key={o.id}
-                  className={`pointer-events-auto absolute cursor-move overflow-hidden rounded-md ${
-                    isSel(o.id) ? "ring-2 ring-blue-500" : ""
-                  } ${lockedIds.includes(o.id) ? "opacity-90" : ""}`}
-                  style={{ left: o.x, top: o.y, width: o.w, height: o.h }}
-                  onPointerDown={(e) => onItemPointerDown(o.id, e)}
-                >
-                  <img
-                    src={o.image}
-                    alt=""
-                    draggable={false}
-                    className={`h-full w-full ${o.overlay ? "object-contain" : "object-cover"}`}
-                  />
-                </div>
-              ))}
+              {objects.map((o) => {
+                const one = isSel(o.id) && selection.length === 1 && !lockedIds.includes(o.id);
+                return (
+                  <div
+                    key={o.id}
+                    className="pointer-events-auto absolute"
+                    style={{ left: o.x, top: o.y, width: o.w, height: o.h }}
+                    onPointerDown={(e) => onItemPointerDown(o.id, e)}
+                  >
+                    <div
+                      className={`h-full w-full cursor-move overflow-hidden rounded-md ${
+                        isSel(o.id) ? "ring-2 ring-blue-500" : ""
+                      } ${lockedIds.includes(o.id) ? "opacity-90" : ""}`}
+                    >
+                      <img
+                        src={o.image}
+                        alt=""
+                        draggable={false}
+                        className={`h-full w-full ${o.overlay ? "object-contain" : "object-cover"}`}
+                      />
+                    </div>
+                    {one &&
+                      (
+                        [
+                          ["tl", "-left-1 -top-1 cursor-nwse-resize"],
+                          ["tr", "-right-1 -top-1 cursor-nesw-resize"],
+                          ["bl", "-left-1 -bottom-1 cursor-nesw-resize"],
+                          ["br", "-right-1 -bottom-1 cursor-nwse-resize"],
+                        ] as ["tl" | "tr" | "bl" | "br", string][]
+                      ).map(([corner, cls]) => (
+                        <span
+                          key={corner}
+                          onPointerDown={(e) => {
+                            e.stopPropagation();
+                            onObjectResizeStart(o, corner, e);
+                          }}
+                          className={`absolute ${cls} h-2.5 w-2.5 rounded-[2px] border-2 border-blue-500 bg-white shadow-sm`}
+                        />
+                      ))}
+                  </div>
+                );
+              })}
 
               {/* Marquee selection box (rendered in screen space via the world's inverse) */}
             </div>
@@ -3335,6 +3566,48 @@ function Composer({
                 }}
               />
             )}
+
+            {/* Content-edit control bar (screen space) */}
+            {editingFrameId &&
+              (() => {
+                const ef = frames.find((f) => f.id === editingFrameId);
+                const pct = Math.round(((ef?.content?.scale ?? 1) as number) * 100);
+                return (
+                  <div
+                    onPointerDown={(e) => e.stopPropagation()}
+                    className="absolute left-1/2 top-3 flex -translate-x-1/2 items-center gap-1 rounded-2xl border border-border bg-card px-2 py-1.5 text-sm shadow-lg"
+                    style={{ cursor: "default" }}
+                  >
+                    <span className="px-1 text-xs font-semibold text-muted-foreground">
+                      Editing content — drag to reposition
+                    </span>
+                    <button
+                      onClick={() => scaleContent(editingFrameId, -0.1)}
+                      aria-label="Scale down"
+                      className="grid h-7 w-7 place-items-center rounded-lg hover:bg-muted"
+                    >
+                      <Minus className="h-4 w-4" />
+                    </button>
+                    <span className="w-10 text-center text-xs font-semibold tabular-nums">
+                      {pct}%
+                    </span>
+                    <button
+                      onClick={() => scaleContent(editingFrameId, 0.1)}
+                      aria-label="Scale up"
+                      className="grid h-7 w-7 place-items-center rounded-lg hover:bg-muted"
+                    >
+                      <Plus className="h-4 w-4" />
+                    </button>
+                    <span className="mx-1 h-6 w-px bg-border" />
+                    <button
+                      onClick={() => setEditingFrameId(null)}
+                      className="rounded-lg bg-primary px-3 py-1.5 text-xs font-bold text-white transition hover:brightness-110"
+                    >
+                      Done
+                    </button>
+                  </div>
+                );
+              })()}
 
             {/* Ghost frame trailing the cursor while placing (CapCut-style + badge) */}
             {placing && ghost && (
@@ -3357,8 +3630,12 @@ function Composer({
                 Rendered in screen space so it stays a constant size (font/size don't
                 shrink on zoom); its position tracks the frame through pan/zoom/drag. */}
             {(() => {
-              // Only show the per-frame toolbar when exactly one frame is selected.
-              const sf = selection.length === 1 ? frames.find((f) => f.id === selection[0]) : null;
+              // Only show the per-frame toolbar when exactly one frame is selected
+              // and not in content-edit mode (that has its own bar).
+              const sf =
+                !editingFrameId && selection.length === 1
+                  ? frames.find((f) => f.id === selection[0])
+                  : null;
               if (!sf) return null;
               const barX = view.x + (sf.x + (sf.w * DISPLAY_SCALE) / 2) * view.zoom;
               const barY = view.y + sf.y * view.zoom - 8;
