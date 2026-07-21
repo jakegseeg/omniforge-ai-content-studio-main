@@ -373,9 +373,18 @@ const EX_POOL = [
   "https://images.unsplash.com/photo-1500382017468-9049fed747ef?w=300",
   "https://images.unsplash.com/photo-1483728642387-6c3bdd6c93e5?w=300",
 ];
-// Fixed feeds shown for every category, then topic carousels.
-const EXPLORER_FIXED = ["Recently Used", "Trending", "Recommendations", "Lead", "Hook", "Effects"];
-const EXPLORER_TOPICS = ["People", "Food", "Aerial Shots", "Sky", "Nature", "Travel", "Cinematic"];
+// The 8 global section rows shown first, in this exact order, for every asset
+// type (asset-library-category-structure-2026.md).
+const GLOBAL_ROWS = [
+  "Recently Used",
+  "Trending",
+  "Recommended",
+  "Favorites",
+  "Team Assets",
+  "Brand Assets",
+  "AI Generated",
+  "Uploaded Assets",
+];
 
 // Metadata shown beneath each thumbnail, keyed by tile label
 // (from asset-library-dimensions-2026.md; cycled across cards in a row).
@@ -405,6 +414,319 @@ const ASSET_META: Record<string, string[]> = {
   Uploads: ["Original size"],
 };
 
+// Per-type category rows shown after the 8 global rows, and the folder /
+// subfolder options offered in the upload placement flow. Keyed by the tile
+// label (asset-library-category-structure-2026.md). Folders with no subfolders
+// browse flat; nested types (Photos, Shapes) expose their subfolders.
+type Folder = { folder: string; subfolders: string[] };
+const flat = (names: string[]): Folder[] => names.map((folder) => ({ folder, subfolders: [] }));
+const TYPE_FOLDERS: Record<string, Folder[]> = {
+  Photos: [
+    {
+      folder: "People",
+      subfolders: ["Business", "Families", "Lifestyle", "Fitness", "Healthcare"],
+    },
+    { folder: "Nature", subfolders: ["Mountains", "Forests", "Beaches", "Lakes"] },
+    { folder: "Food", subfolders: ["Restaurants", "Cooking", "Drinks", "Desserts"] },
+    { folder: "Business", subfolders: ["Meetings", "Offices", "Technology", "Marketing"] },
+    { folder: "Travel", subfolders: ["Cities", "Resorts", "Adventure"] },
+    { folder: "Seasonal", subfolders: ["Christmas", "Summer", "Halloween"] },
+  ],
+  Videos: flat([
+    "Hooks",
+    "Leads",
+    "Transitions",
+    "B-Roll",
+    "Product Shots",
+    "Lifestyle",
+    "Aerial",
+    "Drone",
+    "Nature",
+    "Food",
+    "Travel",
+    "Business",
+    "Sports",
+    "Real Estate",
+    "Education",
+    "Cinematic",
+    "Social Media",
+  ]),
+  Graphics: flat([
+    "Social Graphics",
+    "Marketing Graphics",
+    "Business Graphics",
+    "Infographics",
+    "Decorative Graphics",
+    "UI Graphics",
+    "Abstract Graphics",
+    "Hand Drawn",
+    "Illustration Packs",
+    "Brand Graphics",
+    "Seasonal Graphics",
+    "Sales Graphics",
+    "Event Graphics",
+    "Holiday Graphics",
+  ]),
+  Shapes: [
+    { folder: "Basic", subfolders: ["Rectangle", "Circle", "Triangle"] },
+    ...flat([
+      "Geometric",
+      "Organic",
+      "Abstract",
+      "Arrows",
+      "Speech Bubbles",
+      "Lines",
+      "Dividers",
+      "Decorative",
+      "Social Media",
+      "Callout Shapes",
+      "Modern",
+      "Minimal",
+      "Rounded",
+    ]),
+  ],
+  Icons: flat([
+    "Business",
+    "Marketing",
+    "Technology",
+    "Social Media",
+    "Education",
+    "Healthcare",
+    "Finance",
+    "Ecommerce",
+    "Arrows",
+    "UI",
+    "Navigation",
+    "Communication",
+  ]),
+  Stickers: flat([
+    "Social Media",
+    "Reactions",
+    "Emojis",
+    "Sale",
+    "Promotional",
+    "Seasonal",
+    "Business",
+    "Fun",
+    "Educational",
+  ]),
+  Logo: flat([
+    "Wordmarks",
+    "Monograms",
+    "Emblems",
+    "Mascots",
+    "Abstract",
+    "Corporate",
+    "Startup",
+    "Technology",
+    "Fitness",
+    "Food",
+    "Fashion",
+  ]),
+  Backgrounds: flat([
+    "Gradients",
+    "Abstract",
+    "Nature",
+    "Business",
+    "Technology",
+    "Minimal",
+    "Textures",
+    "Seasonal",
+    "Luxury",
+  ]),
+  Gradients: flat([
+    "Warm",
+    "Cool",
+    "Neon",
+    "Luxury",
+    "Sunset",
+    "Corporate",
+    "Vibrant",
+    "Minimal",
+    "Dark Mode",
+  ]),
+  Animations: flat([
+    "Text Animations",
+    "Entrances",
+    "Exits",
+    "Transitions",
+    "Social Media",
+    "Product",
+    "Logo Reveals",
+    "Lower Thirds",
+    "Motion Graphics",
+    "Effects",
+    "Trending",
+    "Viral",
+    "Business",
+    "Education",
+  ]),
+  Audio: flat([
+    "Music",
+    "Sound Effects",
+    "Voiceovers",
+    "Ambient",
+    "Cinematic",
+    "Corporate",
+    "Upbeat",
+    "Podcast",
+    "Inspirational",
+    "Electronic",
+    "Acoustic",
+    "Loops",
+    "Beats",
+    "Social Media",
+  ]),
+  Charts: flat([
+    "Bar",
+    "Line",
+    "Pie",
+    "Donut",
+    "Area",
+    "Funnel",
+    "Growth",
+    "Marketing",
+    "Analytics",
+    "Financial",
+    "Presentation",
+    "Dashboard",
+  ]),
+  Tables: flat([
+    "Pricing Tables",
+    "Comparison Tables",
+    "Data Tables",
+    "Schedules",
+    "Calendars",
+    "Product Tables",
+    "Analytics Tables",
+  ]),
+  Forms: flat([
+    "Contact",
+    "Lead Capture",
+    "Newsletter",
+    "Registration",
+    "Survey",
+    "Event",
+    "Booking",
+    "Feedback",
+    "Application",
+    "Support",
+  ]),
+  Sheets: flat([
+    "Budget",
+    "Marketing",
+    "Content Planning",
+    "Social Media",
+    "Editorial",
+    "Campaign Tracking",
+    "CRM",
+    "Finance",
+    "KPI",
+    "Analytics",
+  ]),
+  Frames: flat([
+    "Social Media",
+    "Mobile",
+    "Desktop",
+    "Story",
+    "Reel",
+    "Presentation",
+    "Device Frames",
+    "Polaroid",
+    "Modern",
+    "Minimal",
+  ]),
+  Grids: flat([
+    "Instagram",
+    "Masonry",
+    "Gallery",
+    "Comparison",
+    "Product",
+    "Portfolio",
+    "Editorial",
+  ]),
+  Mockups: flat([
+    "Mobile Phones",
+    "Tablets",
+    "Laptops",
+    "Desktop",
+    "Billboards",
+    "Packaging",
+    "Apparel",
+    "Books",
+    "Business Cards",
+    "Signage",
+    "Social Media",
+  ]),
+  "3D": flat([
+    "Objects",
+    "Characters",
+    "Abstract",
+    "Icons",
+    "Devices",
+    "Furniture",
+    "Technology",
+    "Marketing",
+    "Product Display",
+    "Scenes",
+  ]),
+  PDFs: flat([
+    "Reports",
+    "Presentations",
+    "White Papers",
+    "Case Studies",
+    "Brochures",
+    "Sales Decks",
+    "Training",
+    "Proposals",
+  ]),
+  Templates: flat([
+    "Social Posts",
+    "Reels",
+    "Stories",
+    "Ads",
+    "Carousels",
+    "Blog Graphics",
+    "YouTube",
+    "LinkedIn",
+    "Presentations",
+    "Email",
+    "Flyers",
+    "Posters",
+    "Events",
+    "Product Launches",
+    "Real Estate",
+    "Healthcare",
+    "Education",
+  ]),
+  Text: flat([
+    "Headlines",
+    "Subheads",
+    "Quotes",
+    "Captions",
+    "CTA",
+    "Minimal",
+    "Bold",
+    "Luxury",
+    "Corporate",
+    "Social Media",
+    "Viral",
+    "Trending",
+  ]),
+  Uploads: flat([
+    "Recent Uploads",
+    "Images",
+    "Videos",
+    "Audio",
+    "Documents",
+    "PDFs",
+    "Team Assets",
+    "Brand Assets",
+    "Folders",
+    "Shared Assets",
+  ]),
+};
+
 // Drop behavior classes (source of truth: asset-behavior-matrix-2026.md).
 // Photo/Video/Animation/PDF onto a frame → Fill/Fit/Place-Freely modal.
 const MODAL_TYPES = new Set(["Photos", "Videos", "Animations", "PDFs"]);
@@ -413,19 +735,30 @@ const OVERLAY_TYPES = new Set(["Icons", "Stickers", "Logo", "Graphics", "3D", "S
 // Backgrounds/Gradients → auto-fill the frame, no modal.
 const FILL_TYPES = new Set(["Backgrounds", "Gradients"]);
 
+type RowKind = "image" | "video" | "audio" | "pdf";
+// Short overlay tag drawn on the thumbnail for time/page-based assets
+// (asset-library-dimensions-2026.md: video/audio/pdf get an on-thumb tag).
+function overlayTag(kind: RowKind, i: number): string | null {
+  if (kind === "video") return `${8 + i * 3}.0s`;
+  if (kind === "audio") return `${1 + (i % 5)}:${String((i * 13) % 60).padStart(2, "0")}`;
+  if (kind === "pdf") return `${(i + 1) * 3} pp`;
+  return null;
+}
+
 function ExplorerRow({
   title,
-  video,
+  kind,
   pool,
   meta,
   onPick,
 }: {
   title: string;
-  video: boolean;
+  kind: RowKind;
   pool: string[];
   meta: string[];
   onPick: (img: string) => void;
 }) {
+  const tall = kind === "video";
   return (
     <section className="mt-5">
       <div className="mb-2 flex items-center justify-between">
@@ -438,37 +771,40 @@ function ExplorerRow({
         </button>
       </div>
       <div className="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        {pool.map((img, i) => (
-          <div key={i} className="shrink-0">
-            <button
-              draggable
-              onDragStart={(e) => {
-                e.dataTransfer.setData("text/omni-asset", img);
-                e.dataTransfer.effectAllowed = "copy";
-              }}
-              onClick={() => onPick(img)}
-              title="Click to place, or drag onto the canvas"
-              className={`relative block cursor-grab overflow-hidden rounded-lg border border-border transition hover:border-primary active:cursor-grabbing ${
-                video ? "h-28 w-[86px]" : "h-20 w-[104px]"
-              }`}
-            >
-              <img
-                src={img}
-                alt=""
-                draggable={false}
-                className="absolute inset-0 h-full w-full object-cover"
-              />
-              {video && (
-                <span className="absolute bottom-1 left-1 rounded bg-black/70 px-1 py-0.5 text-[9px] font-semibold text-white">
-                  {8 + i * 3}.0s
-                </span>
-              )}
-            </button>
-            <div className="mt-1 w-[104px] max-w-full truncate text-[9px] font-medium text-muted-foreground">
-              {meta[i % meta.length]}
+        {pool.map((img, i) => {
+          const tag = overlayTag(kind, i);
+          return (
+            <div key={i} className="shrink-0">
+              <button
+                draggable
+                onDragStart={(e) => {
+                  e.dataTransfer.setData("text/omni-asset", img);
+                  e.dataTransfer.effectAllowed = "copy";
+                }}
+                onClick={() => onPick(img)}
+                title="Click to place, or drag onto the canvas"
+                className={`relative block cursor-grab overflow-hidden rounded-lg border border-border transition hover:border-primary active:cursor-grabbing ${
+                  tall ? "h-28 w-[86px]" : "h-20 w-[104px]"
+                }`}
+              >
+                <img
+                  src={img}
+                  alt=""
+                  draggable={false}
+                  className="absolute inset-0 h-full w-full object-cover"
+                />
+                {tag && (
+                  <span className="absolute bottom-1 left-1 rounded bg-black/70 px-1 py-0.5 text-[9px] font-semibold text-white">
+                    {tag}
+                  </span>
+                )}
+              </button>
+              <div className="mt-1 w-[104px] max-w-full truncate text-[9px] font-medium text-muted-foreground">
+                {meta[i % meta.length]}
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </section>
   );
@@ -479,18 +815,37 @@ function AssetExplorer({
   category,
   onBack,
   onPick,
+  uploads,
 }: {
   category: string;
   onBack: () => void;
   onPick: (image: string, type: string) => void;
+  uploads: string[];
 }) {
   const [q, setQ] = useState("");
-  const video = category === "Videos" || category === "Animations";
-  const rows = [...EXPLORER_FIXED, ...EXPLORER_TOPICS];
+  const kind: RowKind =
+    category === "Videos" || category === "Animations"
+      ? "video"
+      : category === "Audio"
+        ? "audio"
+        : category === "PDFs"
+          ? "pdf"
+          : "image";
+  const typeCats = (TYPE_FOLDERS[category] ?? []).map((f) => f.folder);
+  const rows = [...GLOBAL_ROWS, ...typeCats];
   const ql = q.trim().toLowerCase();
   const visible = ql ? rows.filter((r) => r.toLowerCase().includes(ql)) : rows;
+  const meta = ASSET_META[category] ?? ["1080 × 1080"];
   const poolFor = (seed: number) =>
     EX_POOL.map((_, i) => EX_POOL[(i + seed) % EX_POOL.length]).slice(0, 8);
+  // Uploaded assets surface at the front of the Uploaded Assets / Recently Used rows.
+  const rowPool = (title: string, seed: number) => {
+    const base = poolFor(seed);
+    if (uploads.length && (title === "Uploaded Assets" || title === "Recently Used")) {
+      return [...uploads, ...base].slice(0, 8);
+    }
+    return base;
+  };
 
   return (
     <div className="shrink-0">
@@ -526,29 +881,31 @@ function AssetExplorer({
         </button>
       </div>
 
-      <div className="mt-3 flex gap-2 overflow-x-auto whitespace-nowrap pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        {EXPLORER_TOPICS.map((t) => (
-          <button
-            key={t}
-            onClick={() => setQ(q === t ? "" : t)}
-            className={`h-7 shrink-0 rounded-full px-3 text-xs font-semibold transition ${
-              q === t
-                ? "bg-primary text-white"
-                : "bg-secondary text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            {t}
-          </button>
-        ))}
-      </div>
+      {typeCats.length > 0 && (
+        <div className="mt-3 flex gap-2 overflow-x-auto whitespace-nowrap pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          {typeCats.map((t) => (
+            <button
+              key={t}
+              onClick={() => setQ(q === t ? "" : t)}
+              className={`h-7 shrink-0 rounded-full px-3 text-xs font-semibold transition ${
+                q === t
+                  ? "bg-primary text-white"
+                  : "bg-secondary text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {t}
+            </button>
+          ))}
+        </div>
+      )}
 
       {visible.map((title, i) => (
         <ExplorerRow
           key={title}
           title={title}
-          video={video}
-          pool={poolFor(i)}
-          meta={ASSET_META[category] ?? ["1080 × 1080"]}
+          kind={kind}
+          pool={rowPool(title, i)}
+          meta={meta}
           onPick={(img) => onPick(img, category)}
         />
       ))}
@@ -3136,6 +3493,56 @@ function Composer({
   const [assetFilter, setAssetFilter] = useState("All");
   // When set, the left sidebar shows the category explorer instead of the tile grid.
   const [openCategory, setOpenCategory] = useState<string | null>(null);
+  // Assets the user uploaded this session, and the in-progress "Content Loaded"
+  // placement draft (null when the modal is closed).
+  const [uploads, setUploads] = useState<
+    {
+      id: string;
+      name: string;
+      url: string | null;
+      type: string;
+      folder: string | null;
+      sub: string | null;
+    }[]
+  >([]);
+  const [uploadDraft, setUploadDraft] = useState<{
+    name: string;
+    url: string | null;
+    type: string;
+    folder: string | null;
+    sub: string | null;
+  } | null>(null);
+  // Auto-detect which Asset Library type a freshly uploaded file belongs to.
+  const detectAssetType = (file: File): string => {
+    const name = file.name.toLowerCase();
+    if (name.endsWith(".svg")) return "Graphics";
+    if (file.type.startsWith("image/")) return "Photos";
+    if (file.type.startsWith("video/")) return "Videos";
+    if (file.type.startsWith("audio/")) return "Audio";
+    if (file.type === "application/pdf" || name.endsWith(".pdf")) return "PDFs";
+    return "Uploads";
+  };
+  const commitUpload = (withFolder: boolean) => {
+    if (!uploadDraft) return;
+    const { name, url, type, folder, sub } = uploadDraft;
+    setUploads((u) => [
+      {
+        id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        name,
+        url,
+        type,
+        folder: withFolder ? folder : null,
+        sub: withFolder ? sub : null,
+      },
+      ...u,
+    ]);
+    const dest =
+      withFolder && folder
+        ? `${type} › ${folder}${sub ? ` › ${sub}` : ""}`
+        : `${type} › Uploaded Assets`;
+    toast.success(`“${name}” added to ${dest}`);
+    setUploadDraft(null);
+  };
   const visibleTiles =
     assetFilter === "All" ? ASSET_TILES : ASSET_TILES.filter((t) => t.cats.includes(assetFilter));
 
@@ -3209,6 +3616,11 @@ function Composer({
     setUploadedVideo(f.name);
     setTab("clips");
     toast.success(`Processed "${f.name}" — 3 AI clips ready`);
+    // After the source upload finishes, open the "Content Loaded" placement
+    // flow so the file can be filed into an Asset Library type/folder.
+    const url = f.type.startsWith("image/") ? URL.createObjectURL(f) : null;
+    setUploadDraft({ name: f.name, url, type: detectAssetType(f), folder: null, sub: null });
+    e.target.value = "";
   };
 
   // Turn a board frame into a post for the Calendar sidebar.
@@ -3278,6 +3690,9 @@ function Composer({
             category={openCategory}
             onBack={() => setOpenCategory(null)}
             onPick={(image, type) => armAsset(image, type)}
+            uploads={uploads
+              .filter((u) => u.type === openCategory && u.url)
+              .map((u) => u.url as string)}
           />
         ) : (
           <>
@@ -4184,6 +4599,142 @@ function Composer({
           </div>
         </div>
       )}
+
+      {/* "Content Loaded" upload placement modal — pick a type, then a folder /
+          subfolder from that type's category list (or skip to Uploaded Assets). */}
+      {uploadDraft &&
+        (() => {
+          const folders = TYPE_FOLDERS[uploadDraft.type] ?? [];
+          const activeFolder = folders.find((f) => f.folder === uploadDraft.folder);
+          const subs = activeFolder?.subfolders ?? [];
+          return (
+            <div
+              className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm"
+              onClick={() => setUploadDraft(null)}
+            >
+              <div
+                className="max-h-[85vh] w-full max-w-md overflow-y-auto rounded-2xl border border-border bg-card p-6 text-foreground shadow-2xl"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <h3 className="text-lg font-bold">Content Loaded</h3>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Where would you like to place it?
+                </p>
+
+                <div className="mt-4 flex items-center gap-3 rounded-xl border border-border bg-secondary/40 p-3">
+                  {uploadDraft.url ? (
+                    <img
+                      src={uploadDraft.url}
+                      alt=""
+                      className="h-12 w-12 shrink-0 rounded-lg object-cover"
+                    />
+                  ) : (
+                    <span className="grid h-12 w-12 shrink-0 place-items-center rounded-lg bg-muted">
+                      <FileText className="h-5 w-5 text-muted-foreground" />
+                    </span>
+                  )}
+                  <span className="truncate text-sm font-semibold">{uploadDraft.name}</span>
+                </div>
+
+                {/* Step 1 — asset type (defaulted from the file) */}
+                <label className="mt-5 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  Asset type
+                </label>
+                <select
+                  value={uploadDraft.type}
+                  onChange={(e) =>
+                    setUploadDraft((d) =>
+                      d ? { ...d, type: e.target.value, folder: null, sub: null } : d,
+                    )
+                  }
+                  className="mt-2 w-full rounded-xl border border-border bg-secondary/40 px-3 py-2.5 text-sm font-semibold text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/30"
+                >
+                  {ASSET_TILES.map((t) => (
+                    <option key={t.label} value={t.label}>
+                      {t.label}
+                    </option>
+                  ))}
+                </select>
+
+                {/* Step 2 — folder */}
+                {folders.length > 0 && (
+                  <>
+                    <label className="mt-5 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                      Folder
+                    </label>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {folders.map((f) => (
+                        <button
+                          key={f.folder}
+                          onClick={() =>
+                            setUploadDraft((d) =>
+                              d
+                                ? {
+                                    ...d,
+                                    folder: d.folder === f.folder ? null : f.folder,
+                                    sub: null,
+                                  }
+                                : d,
+                            )
+                          }
+                          className={`h-8 rounded-full px-3 text-xs font-semibold transition ${
+                            uploadDraft.folder === f.folder
+                              ? "bg-primary text-white"
+                              : "bg-secondary text-muted-foreground hover:text-foreground"
+                          }`}
+                        >
+                          {f.folder}
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                )}
+
+                {/* Step 3 — subfolder (only for folders that have them) */}
+                {subs.length > 0 && (
+                  <>
+                    <label className="mt-4 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                      {uploadDraft.folder} subfolder
+                    </label>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {subs.map((s) => (
+                        <button
+                          key={s}
+                          onClick={() =>
+                            setUploadDraft((d) => (d ? { ...d, sub: d.sub === s ? null : s } : d))
+                          }
+                          className={`h-8 rounded-full px-3 text-xs font-semibold transition ${
+                            uploadDraft.sub === s
+                              ? "bg-primary text-white"
+                              : "bg-secondary text-muted-foreground hover:text-foreground"
+                          }`}
+                        >
+                          {s}
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                )}
+
+                <div className="mt-6 flex gap-3">
+                  <button
+                    onClick={() => commitUpload(false)}
+                    className="flex-1 rounded-xl border border-border bg-secondary py-2.5 text-sm font-semibold text-foreground transition hover:bg-muted"
+                  >
+                    Skip — Uploaded Assets
+                  </button>
+                  <button
+                    onClick={() => commitUpload(true)}
+                    disabled={folders.length > 0 && !uploadDraft.folder}
+                    className="flex-1 rounded-xl bg-primary py-2.5 text-sm font-semibold text-white transition hover:brightness-110 disabled:opacity-50"
+                  >
+                    Confirm placement
+                  </button>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
     </div>
   );
 }
