@@ -59,6 +59,9 @@ import {
   Shirt,
   Box,
   Hexagon,
+  Hash,
+  Package,
+  Megaphone,
   File,
   Search,
   X,
@@ -300,6 +303,186 @@ const GENERATED_IDEAS: GeneratedIdea[] = [
     thumb: "https://images.unsplash.com/photo-1473773508845-188df298d2d1?w=300",
   },
 ];
+
+// ---------- RIGHT SIDEBAR: HASHTAG OPTIONS DATA ----------
+type HashTag = { tag: string; reach: string };
+type HashGroup = {
+  id: string;
+  name: string;
+  badge: string;
+  badgeTone: string;
+  group: string; // which filter pill it belongs to
+  desc: string;
+  tags: HashTag[];
+};
+const HASHTAG_PILLS = ["All groups", "Summer", "Product", "Brand", "Local"];
+const EDITOR_MODES = ["Captions", "Script", "Headlines"] as const;
+const HASHTAG_GROUPS: HashGroup[] = [
+  {
+    id: "hg-summer",
+    name: "Summer Campaign",
+    badge: "High engagement",
+    badgeTone: "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400",
+    group: "Summer",
+    desc: "For summer sale and seasonal posts",
+    tags: [
+      { tag: "#summersale", reach: "840K" },
+      { tag: "#summervibes", reach: "2.1M" },
+      { tag: "#hotdeals", reach: "320K" },
+      { tag: "#shopnow", reach: "1.4M" },
+      { tag: "#seasonal", reach: "410K" },
+    ],
+  },
+  {
+    id: "hg-local",
+    name: "Local & Community",
+    badge: "Niche reach",
+    badgeTone: "bg-muted text-muted-foreground",
+    group: "Local",
+    desc: "Location and community hashtags",
+    tags: [
+      { tag: "#utahbusiness", reach: "48K" },
+      { tag: "#orem", reach: "22K" },
+      { tag: "#supportlocal", reach: "1.9M" },
+      { tag: "#utahentrepreneur", reach: "31K" },
+    ],
+  },
+  {
+    id: "hg-brand",
+    name: "Brand Awareness",
+    badge: "Steady reach",
+    badgeTone: "bg-amber-500/15 text-amber-600 dark:text-amber-400",
+    group: "Brand",
+    desc: "Core brand hashtags for every post",
+    tags: [
+      { tag: "#checkinapp", reach: "12K" },
+      { tag: "#socialmediatools", reach: "290K" },
+      { tag: "#contentcreation", reach: "3.2M" },
+      { tag: "#marketingtips", reach: "1.8M" },
+      { tag: "#smallbusiness", reach: "4.1M" },
+    ],
+  },
+  {
+    id: "hg-engagement",
+    name: "Engagement Boosters",
+    badge: "Max reach",
+    badgeTone: "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400",
+    group: "Brand",
+    desc: "High-reach hashtags to broaden exposure",
+    tags: [
+      { tag: "#viral", reach: "12.4M" },
+      { tag: "#trending", reach: "8.1M" },
+      { tag: "#reels", reach: "9.2M" },
+      { tag: "#fyp", reach: "22M" },
+    ],
+  },
+  {
+    id: "hg-stories",
+    name: "Customer Stories",
+    badge: "Steady reach",
+    badgeTone: "bg-amber-500/15 text-amber-600 dark:text-amber-400",
+    group: "Brand",
+    desc: "Testimonials and UGC posts",
+    tags: [
+      { tag: "#customerreview", reach: "380K" },
+      { tag: "#testimonial", reach: "210K" },
+      { tag: "#happycustomer", reach: "920K" },
+      { tag: "#ugc", reach: "1.6M" },
+    ],
+  },
+  {
+    id: "hg-product",
+    name: "Product Launch",
+    badge: "High engagement",
+    badgeTone: "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400",
+    group: "Product",
+    desc: "For new features and releases",
+    tags: [
+      { tag: "#productlaunch", reach: "720K" },
+      { tag: "#buildinpublic", reach: "640K" },
+      { tag: "#saas", reach: "950K" },
+      { tag: "#techstartup", reach: "1.1M" },
+    ],
+  },
+];
+
+// ---------- RIGHT SIDEBAR: PACKAGE BUILDER TYPES ----------
+// A saved Caption / Script / Headline from the Caption Editor card. Saves never
+// overwrite — each press of the blue Save button appends a numbered entry.
+type SavedText = {
+  id: string;
+  kind: "Caption" | "Script" | "Headline";
+  label: string;
+  text: string;
+};
+// A package references the items chosen in each dropdown.
+type Pkg = {
+  id: string;
+  name: string;
+  image: string;
+  platforms: string[]; // content destinations from Content Options
+  frameIds: string[];
+  textIds: string[]; // SavedText ids from Caption Options
+  tags: string[]; // hashtag strings from Hashtag Options
+  campaigns: string[]; // idea day labels from Campaign Options
+};
+// What a "Save to Package" press is trying to add (shared Package Modal payload).
+type PkgDraft = {
+  kind: "content" | "captions" | "hashtags" | "campaign";
+  platforms?: string[];
+  frameIds?: string[];
+  textIds?: string[];
+  tags?: string[];
+  campaigns?: string[];
+  summary: string;
+};
+
+// One collapsible section of the restructured right sidebar.
+function SidebarPanel({
+  title,
+  Icon,
+  open,
+  onToggle,
+  children,
+}: {
+  title: string;
+  Icon: IconType;
+  open: boolean;
+  onToggle: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <div className="rounded-[18px] bg-card shadow-[0_2px_6px_rgba(26,24,35,0.14)]">
+      <button onClick={onToggle} className="flex w-full items-center justify-between px-4 py-3">
+        <span className="flex items-center gap-2.5 text-sm font-bold text-foreground">
+          <Icon className="h-4 w-4" /> {title}
+        </span>
+        <ChevronDown
+          className={`h-4 w-4 text-primary transition-transform ${open ? "rotate-180" : ""}`}
+        />
+      </button>
+      {open && <div className="px-4 pb-4">{children}</div>}
+    </div>
+  );
+}
+
+// The one standardized green button used by every dropdown that can feed a package.
+function SaveToPackage({
+  onClick,
+  label = "Save to Package",
+}: {
+  onClick: () => void;
+  label?: string;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-500 py-2.5 text-sm font-bold text-white shadow-sm transition hover:brightness-110"
+    >
+      <Sparkles className="h-4 w-4" /> {label}
+    </button>
+  );
+}
 
 // ---------- COMPOSER: ASSET LIBRARY DATA ----------
 // Horizontally-scrollable filter pills. "All" always shows everything.
@@ -2695,6 +2878,10 @@ type SentPost = {
   h: number;
   headline: string;
   image: string;
+  // Set only when the entry came from "Send Options to Calendar" — one entry per
+  // platform in the package. Drag-to-schedule behaviour is unchanged.
+  packageName?: string;
+  packageDetail?: { captions: string[]; tags: string[]; campaigns: string[] };
 };
 
 // "Select to Send" lists these 5 by default; the Edit link can add the rest.
@@ -3382,6 +3569,128 @@ function Composer({
   const [checkedFrames, setCheckedFrames] = useState<string[]>([]);
   const [uploadedVideo, setUploadedVideo] = useState<string | null>(null);
 
+  // ----- Update 3: Caption Editor toggle + package builder -----
+  // Captions stays wired to the AI Idea Engine (existing `caption` state);
+  // Script and Headlines each get their own independent draft + saved list.
+  const [editorMode, setEditorMode] = useState<"Captions" | "Script" | "Headlines">("Captions");
+  const [scriptDraft, setScriptDraft] = useState("");
+  const [headlineDraft, setHeadlineDraft] = useState("");
+  const [savedTexts, setSavedTexts] = useState<SavedText[]>([]);
+  // Which right-sidebar accordion is open (one at a time).
+  const [openPanel, setOpenPanel] = useState<string | null>(null);
+  // "Select to Send" header settings menu — toggles which optional dropdowns show.
+  const [sendSettingsOpen, setSendSettingsOpen] = useState(false);
+  const [showScriptPanel, setShowScriptPanel] = useState(false);
+  const [pickedScripts, setPickedScripts] = useState<string[]>([]);
+  // Selections awaiting a "Save to Package" press.
+  const [pickedTexts, setPickedTexts] = useState<string[]>([]);
+  const [pickedCampaigns, setPickedCampaigns] = useState<string[]>([]);
+  const [pickedTags, setPickedTags] = useState<string[]>([]);
+  const [hashPill, setHashPill] = useState("All groups");
+  const [hashGroups, setHashGroups] = useState<HashGroup[]>(HASHTAG_GROUPS);
+  const [editingGroup, setEditingGroup] = useState<string | null>(null);
+  // Packages + the shared Save-to-Package modal.
+  const [packages, setPackages] = useState<Pkg[]>([]);
+  const [pkgDraft, setPkgDraft] = useState<PkgDraft | null>(null);
+  const [pkgMode, setPkgMode] = useState<"choose" | "existing" | "new">("choose");
+  const [pkgPick, setPkgPick] = useState<string>("");
+  const [pkgName, setPkgName] = useState("");
+  const [openPkg, setOpenPkg] = useState<string | null>(null); // detail view
+  const [pickedPkg, setPickedPkg] = useState<string | null>(null); // selection dot
+
+  // Escape closes the package modal (capture phase so it doesn't also clear the
+  // canvas selection via the global Escape handler).
+  useEffect(() => {
+    if (!pkgDraft) return;
+    const onEsc = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.stopImmediatePropagation();
+        setPkgDraft(null);
+      }
+    };
+    window.addEventListener("keydown", onEsc, true);
+    return () => window.removeEventListener("keydown", onEsc, true);
+  }, [pkgDraft]);
+
+  const newId = (p: string) =>
+    `${p}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+  const editorValue =
+    editorMode === "Captions" ? caption : editorMode === "Script" ? scriptDraft : headlineDraft;
+  const setEditorValue = (v: string) =>
+    editorMode === "Captions"
+      ? setCaption(v)
+      : editorMode === "Script"
+        ? setScriptDraft(v)
+        : setHeadlineDraft(v);
+  // Save always appends a new numbered entry — it never overwrites a prior save.
+  const saveEditorText = () => {
+    const text = editorValue.trim();
+    if (!text) {
+      toast.error(`Nothing to save — write a ${editorMode.replace(/s$/, "").toLowerCase()} first`);
+      return;
+    }
+    const kind: SavedText["kind"] =
+      editorMode === "Captions" ? "Caption" : editorMode === "Script" ? "Script" : "Headline";
+    const n = savedTexts.filter((t) => t.kind === kind).length + 1;
+    setSavedTexts((s) => [...s, { id: newId("txt"), kind, label: `${kind} ${n}`, text }]);
+    toast.success(`${kind} ${n} saved to Caption Options`);
+  };
+
+  // Open the shared Package Modal with whatever this dropdown selected.
+  const askPackage = (draft: PkgDraft) => {
+    setPkgDraft(draft);
+    setPkgMode(packages.length ? "choose" : "new");
+    setPkgPick(packages[0]?.id ?? "");
+    setPkgName("");
+  };
+  const closePkgModal = () => setPkgDraft(null);
+  const mergeIntoPkg = (p: Pkg, d: PkgDraft): Pkg => ({
+    ...p,
+    platforms: [...new Set([...p.platforms, ...(d.platforms ?? [])])],
+    frameIds: [...new Set([...p.frameIds, ...(d.frameIds ?? [])])],
+    textIds: [...new Set([...p.textIds, ...(d.textIds ?? [])])],
+    tags: [...new Set([...p.tags, ...(d.tags ?? [])])],
+    campaigns: [...new Set([...p.campaigns, ...(d.campaigns ?? [])])],
+  });
+  const commitPackage = () => {
+    if (!pkgDraft) return;
+    if (pkgMode === "existing") {
+      const target = packages.find((p) => p.id === pkgPick);
+      if (!target) {
+        toast.error("Pick a package first");
+        return;
+      }
+      setPackages((ps) => ps.map((p) => (p.id === pkgPick ? mergeIntoPkg(p, pkgDraft) : p)));
+      toast.success(`${pkgDraft.summary} added to “${target.name}”`);
+    } else {
+      const name = pkgName.trim();
+      if (!name) {
+        toast.error("Give your package a name");
+        return;
+      }
+      const fresh: Pkg = {
+        id: newId("pkg"),
+        name,
+        image: selectedAsset,
+        platforms: [],
+        frameIds: [],
+        textIds: [],
+        tags: [],
+        campaigns: [],
+      };
+      setPackages((ps) => [...ps, mergeIntoPkg(fresh, pkgDraft)]);
+      toast.success(`Package “${name}” created with ${pkgDraft.summary.toLowerCase()}`);
+    }
+    setPkgDraft(null);
+  };
+  // Remove one item from a package (the detail view's Edit action).
+  const removeFromPkg = (pkgId: string, field: keyof Pkg, value: string) =>
+    setPackages((ps) =>
+      ps.map((p) =>
+        p.id === pkgId ? { ...p, [field]: (p[field] as string[]).filter((v) => v !== value) } : p,
+      ),
+    );
+
   // ----- Context menu (Phase 2) — actions operate on the current selection -----
   const uid = (p: string) => p + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
   const openContextMenu = (e: React.MouseEvent) => {
@@ -3636,19 +3945,7 @@ function Composer({
     image: selectedAsset,
   });
 
-  // Purple button: send only the checked sizes.
-  const sendChecked = () => {
-    const picked = frames.filter((f) => checkedFrames.includes(f.id));
-    if (!picked.length) {
-      toast.error("Select at least one size to send");
-      return;
-    }
-    onSendToCalendar(picked.map(toSentPost));
-    setCheckedFrames([]);
-    toast.success(`Sent ${picked.length} post${picked.length > 1 ? "s" : ""} to the calendar`);
-  };
-
-  // Outline button: send every frame on the board.
+  // Persistent bottom CTA: send every frame on the board.
   const sendAllFrames = () => {
     if (!frames.length) {
       toast.error("No frames on the board yet");
@@ -3656,6 +3953,50 @@ function Composer({
     }
     onSendToCalendar(frames.map(toSentPost));
     toast.success(`Sent all ${frames.length} frames to the calendar`);
+  };
+
+  // Green button inside Packaging Options: send the selected package to the
+  // calendar as ONE entry per platform in it. The package itself stays a single
+  // card here — only the calendar view splits per platform.
+  const sendPackageToCalendar = () => {
+    const pkg = packages.find((p) => p.id === pickedPkg);
+    if (!pkg) {
+      toast.error("Select a package first");
+      return;
+    }
+    if (!pkg.platforms.length) {
+      toast.error(`“${pkg.name}” has no platforms — add them from Content Options`);
+      return;
+    }
+    const detail = {
+      captions: pkg.textIds
+        .map((id) => savedTexts.find((t) => t.id === id))
+        .filter(Boolean)
+        .map((t) => `${t!.label}: ${t!.text}`),
+      tags: pkg.tags,
+      campaigns: pkg.campaigns,
+    };
+    const entries: SentPost[] = pkg.platforms.map((label) => {
+      const entry = PLATFORMS.find((p) => p.label === label);
+      const frame = frames.find((f) => f.platform.label === label);
+      return {
+        id: `${pkg.id}-${label}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        platform: label,
+        Icon: entry?.Icon ?? Sparkles,
+        contentLabel: pkg.name,
+        aspect: frame?.aspect ?? "—",
+        w: frame?.w ?? 1080,
+        h: frame?.h ?? 1080,
+        headline: frame?.headline ?? pkg.name,
+        image: pkg.image,
+        packageName: pkg.name,
+        packageDetail: detail,
+      };
+    });
+    onSendToCalendar(entries);
+    toast.success(
+      `“${pkg.name}” sent to the calendar as ${entries.length} entr${entries.length > 1 ? "ies" : "y"}`,
+    );
   };
 
   // Group a platform's frames for the dropdown, numbering duplicate content types.
@@ -4332,92 +4673,492 @@ function Composer({
         {/* Caption Editor */}
         <h3 className="text-base font-bold tracking-tight text-foreground">Caption Editor</h3>
         <div className="mt-3 rounded-[18px] bg-card p-3 shadow-[0_2px_8px_rgba(26,24,35,0.12)]">
-          <div className="grid grid-cols-3 rounded-full bg-muted p-1 text-xs font-bold text-muted-foreground">
-            <button className="rounded-full bg-card px-3 py-2 text-foreground shadow-sm">
-              Captions
-            </button>
-            <button className="px-3 py-2">Script</button>
-            <button className="px-3 py-2">Shorts</button>
+          {/* True sliding segmented toggle — the highlight animates between modes.
+              Captions stays wired to the Idea Engine; Script/Headlines are independent. */}
+          <div className="relative grid grid-cols-3 rounded-full bg-muted p-1 text-xs font-bold text-muted-foreground">
+            <span
+              aria-hidden
+              className="pointer-events-none absolute inset-y-1 left-1 w-[calc((100%-0.5rem)/3)] rounded-full bg-card shadow-sm transition-transform duration-300 ease-out"
+              style={{
+                transform: `translateX(${EDITOR_MODES.indexOf(editorMode) * 100}%)`,
+              }}
+            />
+            {EDITOR_MODES.map((m) => (
+              <button
+                key={m}
+                onClick={() => setEditorMode(m)}
+                aria-pressed={editorMode === m}
+                className={`relative z-10 rounded-full px-3 py-2 transition-colors ${
+                  editorMode === m ? "text-foreground" : "hover:text-foreground"
+                }`}
+              >
+                {m}
+              </button>
+            ))}
           </div>
           <button
-            onClick={() => toast("Auto-generating captions…")}
+            onClick={() => toast(`Auto-generating ${editorMode.toLowerCase()}…`)}
             className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-xl border border-primary/40 py-2 text-sm font-bold text-primary transition hover:bg-primary/10"
           >
-            <Type className="h-4 w-4" /> Auto-Generate Captions
+            <Type className="h-4 w-4" /> Auto-Generate {editorMode}
           </button>
           <textarea
-            value={caption}
-            onChange={(e) => setCaption(e.target.value)}
-            className="mt-3 min-h-[104px] w-full resize-none rounded-[16px] border border-border bg-card p-3 text-sm font-bold text-foreground outline-none focus:ring-2 focus:ring-primary/40"
+            value={editorValue}
+            onChange={(e) => setEditorValue(e.target.value)}
+            placeholder={
+              editorMode === "Captions"
+                ? "Write your description of your cross-posting caption.."
+                : `Write your ${editorMode.toLowerCase().replace(/s$/, "")}…`
+            }
+            className="mt-3 min-h-[104px] w-full resize-none rounded-[16px] border border-border bg-card p-3 text-sm font-bold text-foreground outline-none placeholder:font-medium placeholder:text-muted-foreground/70 focus:ring-2 focus:ring-primary/40"
           />
+          {/* Blue save button — always appends a new numbered entry, never overwrites. */}
+          <button
+            onClick={saveEditorText}
+            className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#2f80ed] py-2.5 text-sm font-bold text-white shadow-sm transition hover:brightness-110"
+          >
+            <Sparkles className="h-4 w-4" />
+            {editorMode === "Captions"
+              ? "Save Caption"
+              : editorMode === "Script"
+                ? "Save Script"
+                : "Save Headline"}
+          </button>
         </div>
 
-        {/* Select to Send */}
-        <div className="mt-5">
-          <div className="flex items-center justify-between">
-            <div className="text-base font-bold text-foreground">Select to Send</div>
-            <div className="relative">
-              <button
-                onClick={() => setEditOpen((o) => !o)}
-                className="text-sm font-semibold text-primary transition hover:text-primary/80"
-              >
-                Edit
-              </button>
-              {editOpen && (
-                <>
-                  <div className="fixed inset-0 z-10" onClick={() => setEditOpen(false)} />
-                  <div className="absolute right-0 top-full z-20 mt-2 w-52 rounded-xl border border-border bg-popover p-1 text-popover-foreground shadow-xl">
-                    <div className="px-2 py-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                      Add platform
+        {/* "Select to Send" header row — the gear opens settings for which
+            optional dropdowns appear below. */}
+        <div className="mt-5 flex items-center justify-between">
+          <div className="text-base font-bold text-foreground">Select to Send</div>
+          <div className="relative">
+            <button
+              onClick={() => setSendSettingsOpen((o) => !o)}
+              aria-label="Sidebar settings"
+              className="text-primary transition hover:text-primary/80"
+            >
+              <Settings className="h-4 w-4" />
+            </button>
+            {sendSettingsOpen && (
+              <>
+                <div className="fixed inset-0 z-10" onClick={() => setSendSettingsOpen(false)} />
+                <div className="absolute right-0 top-full z-20 mt-2 w-56 rounded-xl border border-border bg-popover p-1 text-popover-foreground shadow-xl">
+                  <div className="px-2 py-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                    Show dropdowns
+                  </div>
+                  <button
+                    onClick={() => {
+                      setShowScriptPanel((s) => !s);
+                      setSendSettingsOpen(false);
+                    }}
+                    className="flex w-full items-center justify-between gap-2 rounded-lg px-2 py-2 text-sm transition hover:bg-muted"
+                  >
+                    <span>Script Options</span>
+                    {showScriptPanel && <Check className="h-3.5 w-3.5 shrink-0 text-primary" />}
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+
+        {/* Update 3 — workflow accordions; each one can feed the package builder. */}
+        <div className="mt-3 space-y-2">
+          {/* 1 — CONTENT OPTIONS: the existing Select to Send panel, relocated as-is */}
+          <SidebarPanel
+            title="Content Options"
+            Icon={Layers}
+            open={openPanel === "content"}
+            onToggle={() => setOpenPanel((o) => (o === "content" ? null : "content"))}
+          >
+            <div className="flex items-center justify-between">
+              <div className="text-base font-bold text-foreground">Select to Send</div>
+              <div className="relative">
+                <button
+                  onClick={() => setEditOpen((o) => !o)}
+                  className="text-sm font-semibold text-primary transition hover:text-primary/80"
+                >
+                  Edit
+                </button>
+                {editOpen && (
+                  <>
+                    <div className="fixed inset-0 z-10" onClick={() => setEditOpen(false)} />
+                    <div className="absolute right-0 top-full z-20 mt-2 w-52 rounded-xl border border-border bg-popover p-1 text-popover-foreground shadow-xl">
+                      <div className="px-2 py-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                        Add platform
+                      </div>
+                      {PLATFORMS.filter((p) => !sendPlatforms.includes(p.label)).map((p) => (
+                        <button
+                          key={p.label}
+                          onClick={() => {
+                            setSendPlatforms((s) => [...s, p.label]);
+                            setEditOpen(false);
+                            toast.success(`${p.label} added to Select to Send`);
+                          }}
+                          className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-sm transition hover:bg-muted"
+                        >
+                          <Plus className="h-3.5 w-3.5 shrink-0 text-primary" />
+                          <p.Icon className="h-4 w-4 shrink-0" />
+                          <span className="truncate">{p.label}</span>
+                        </button>
+                      ))}
+                      {PLATFORMS.filter((p) => !sendPlatforms.includes(p.label)).length === 0 && (
+                        <p className="px-2 py-2 text-xs text-muted-foreground">
+                          All platforms added.
+                        </p>
+                      )}
                     </div>
-                    {PLATFORMS.filter((p) => !sendPlatforms.includes(p.label)).map((p) => (
-                      <button
-                        key={p.label}
-                        onClick={() => {
-                          setSendPlatforms((s) => [...s, p.label]);
-                          setEditOpen(false);
-                          toast.success(`${p.label} added to Select to Send`);
-                        }}
-                        className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-sm transition hover:bg-muted"
-                      >
-                        <Plus className="h-3.5 w-3.5 shrink-0 text-primary" />
-                        <p.Icon className="h-4 w-4 shrink-0" />
-                        <span className="truncate">{p.label}</span>
-                      </button>
-                    ))}
-                    {PLATFORMS.filter((p) => !sendPlatforms.includes(p.label)).length === 0 && (
-                      <p className="px-2 py-2 text-xs text-muted-foreground">
-                        All platforms added.
-                      </p>
+                  </>
+                )}
+              </div>
+            </div>
+
+            <div className="mt-3 space-y-2">
+              {sendPlatforms.map((label) => {
+                const entry = PLATFORMS.find((p) => p.label === label);
+                if (!entry) return null;
+                const open = openSend === label;
+                const items = sendItemsFor(label);
+                const vertical = items.filter((i) => i.frame.h > i.frame.w);
+                const horizontal = items.filter((i) => i.frame.w >= i.frame.h);
+                const Row = ({ it }: { it: (typeof items)[number] }) => {
+                  const on = checkedFrames.includes(it.frame.id);
+                  return (
+                    <button
+                      onClick={() =>
+                        setCheckedFrames((c) =>
+                          c.includes(it.frame.id)
+                            ? c.filter((x) => x !== it.frame.id)
+                            : [...c, it.frame.id],
+                        )
+                      }
+                      className="flex w-full items-center justify-between gap-2 py-1.5"
+                    >
+                      <span className="flex min-w-0 items-center gap-2">
+                        <span
+                          className={`grid h-4 w-4 shrink-0 place-items-center rounded-full border-2 border-primary ${
+                            on ? "bg-primary" : ""
+                          }`}
+                        >
+                          {on && <Check className="h-2.5 w-2.5 text-white" />}
+                        </span>
+                        <span className="truncate text-sm text-muted-foreground">{it.display}</span>
+                      </span>
+                      <span className="shrink-0 text-sm font-bold text-foreground">
+                        {it.frame.aspect}
+                      </span>
+                    </button>
+                  );
+                };
+                return (
+                  <div
+                    key={label}
+                    className="rounded-[18px] bg-card shadow-[0_2px_6px_rgba(26,24,35,0.14)]"
+                  >
+                    <button
+                      onClick={() => setOpenSend((o) => (o === label ? null : label))}
+                      className="flex w-full items-center justify-between px-4 py-3"
+                    >
+                      <span className="flex items-center gap-2.5 text-sm font-bold text-foreground">
+                        <entry.Icon className="h-4 w-4" /> {label}
+                      </span>
+                      <ChevronDown
+                        className={`h-4 w-4 text-primary transition-transform ${open ? "rotate-180" : ""}`}
+                      />
+                    </button>
+                    {open && (
+                      <div className="px-4 pb-3">
+                        <div className="text-sm font-bold text-foreground">
+                          Choose Sizes to Post
+                        </div>
+                        {items.length === 0 ? (
+                          <p className="mt-2 text-xs text-muted-foreground">
+                            No {label} frames yet — size a frame for {label} on the board.
+                          </p>
+                        ) : (
+                          <>
+                            {vertical.length > 0 && (
+                              <div className="mt-2">
+                                <div className="text-sm font-bold text-foreground">Vertical</div>
+                                {vertical.map((it) => (
+                                  <Row key={it.frame.id} it={it} />
+                                ))}
+                              </div>
+                            )}
+                            {horizontal.length > 0 && (
+                              <div className="mt-2">
+                                <div className="text-sm font-bold text-foreground">Horizontal</div>
+                                {horizontal.map((it) => (
+                                  <Row key={it.frame.id} it={it} />
+                                ))}
+                              </div>
+                            )}
+                          </>
+                        )}
+                      </div>
                     )}
                   </div>
-                </>
-              )}
+                );
+              })}
             </div>
-          </div>
+            <SaveToPackage
+              onClick={() => {
+                const plats = [
+                  ...new Set(
+                    frames.filter((f) => checkedFrames.includes(f.id)).map((f) => f.platform.label),
+                  ),
+                ];
+                if (!plats.length) {
+                  toast.error("Select at least one size to package");
+                  return;
+                }
+                askPackage({
+                  kind: "content",
+                  platforms: plats,
+                  frameIds: checkedFrames,
+                  summary: `${plats.length} content destination${plats.length > 1 ? "s" : ""}`,
+                });
+              }}
+            />
+          </SidebarPanel>
 
-          <div className="mt-3 space-y-2">
-            {sendPlatforms.map((label) => {
-              const entry = PLATFORMS.find((p) => p.label === label);
-              if (!entry) return null;
-              const open = openSend === label;
-              const items = sendItemsFor(label);
-              const vertical = items.filter((i) => i.frame.h > i.frame.w);
-              const horizontal = items.filter((i) => i.frame.w >= i.frame.h);
-              const Row = ({ it }: { it: (typeof items)[number] }) => {
-                const on = checkedFrames.includes(it.frame.id);
-                return (
-                  <button
-                    onClick={() =>
-                      setCheckedFrames((c) =>
-                        c.includes(it.frame.id)
-                          ? c.filter((x) => x !== it.frame.id)
-                          : [...c, it.frame.id],
-                      )
-                    }
-                    className="flex w-full items-center justify-between gap-2 py-1.5"
-                  >
-                    <span className="flex min-w-0 items-center gap-2">
+          {/* 2 — CAPTION OPTIONS: every saved Caption / Script / Headline */}
+          <SidebarPanel
+            title="Caption Options"
+            Icon={Captions}
+            open={openPanel === "captions"}
+            onToggle={() => setOpenPanel((o) => (o === "captions" ? null : "captions"))}
+          >
+            <div className="text-sm font-bold text-foreground">Select to Send</div>
+            {savedTexts.length === 0 ? (
+              <p className="mt-2 text-xs text-muted-foreground">
+                Nothing saved yet — write a caption, script, or headline above and press Save.
+              </p>
+            ) : (
+              <div className="mt-2 max-h-64 space-y-3 overflow-y-auto pr-1">
+                {savedTexts.map((t) => {
+                  const on = pickedTexts.includes(t.id);
+                  return (
+                    <button
+                      key={t.id}
+                      onClick={() =>
+                        setPickedTexts((s) => (on ? s.filter((x) => x !== t.id) : [...s, t.id]))
+                      }
+                      className="flex w-full items-start gap-2.5 text-left"
+                    >
+                      <span
+                        className={`mt-0.5 grid h-4 w-4 shrink-0 place-items-center rounded-full border-2 border-primary ${
+                          on ? "bg-primary" : ""
+                        }`}
+                      >
+                        {on && <Check className="h-2.5 w-2.5 text-white" />}
+                      </span>
+                      <span className="min-w-0">
+                        <span className="block text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                          {t.label}
+                        </span>
+                        <span className="block text-sm font-bold text-foreground">{t.text}</span>
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+            <SaveToPackage
+              onClick={() => {
+                if (!pickedTexts.length) {
+                  toast.error("Select at least one entry");
+                  return;
+                }
+                askPackage({
+                  kind: "captions",
+                  textIds: pickedTexts,
+                  summary: `${pickedTexts.length} caption entr${pickedTexts.length > 1 ? "ies" : "y"}`,
+                });
+              }}
+            />
+          </SidebarPanel>
+
+          {/* 3 — HASHTAG OPTIONS: per-card Edit + its own Save to Package */}
+          <SidebarPanel
+            title="Hashtag Options"
+            Icon={Hash}
+            open={openPanel === "hashtags"}
+            onToggle={() => setOpenPanel((o) => (o === "hashtags" ? null : "hashtags"))}
+          >
+            <div className="flex items-center justify-between">
+              <div className="text-base font-bold text-foreground">Hashtag Options</div>
+              <button
+                onClick={() =>
+                  setHashGroups((gs) => [
+                    ...gs,
+                    {
+                      id: newId("hg"),
+                      name: `New Group ${gs.length + 1}`,
+                      badge: "Steady reach",
+                      badgeTone: "bg-amber-500/15 text-amber-600 dark:text-amber-400",
+                      group: hashPill === "All groups" ? "Brand" : hashPill,
+                      desc: "Your new hashtag group",
+                      tags: [{ tag: "#newtag", reach: "—" }],
+                    },
+                  ])
+                }
+                className="rounded-lg bg-primary px-3 py-1.5 text-xs font-bold text-white transition hover:brightness-110"
+              >
+                New group
+              </button>
+            </div>
+            <div className="mt-3 flex gap-2 overflow-x-auto whitespace-nowrap pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              {HASHTAG_PILLS.map((p) => (
+                <button
+                  key={p}
+                  onClick={() => setHashPill(p)}
+                  className={`h-7 shrink-0 rounded-full px-3 text-xs font-semibold transition ${
+                    hashPill === p
+                      ? "border border-primary/40 bg-primary/10 text-primary"
+                      : "bg-secondary text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  {p}
+                </button>
+              ))}
+            </div>
+            <div className="mt-3 space-y-3">
+              {hashGroups
+                .filter((g) => hashPill === "All groups" || g.group === hashPill)
+                .map((g) => (
+                  <div key={g.id} className="rounded-2xl border border-border bg-card p-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="text-sm font-bold text-foreground">{g.name}</div>
+                      <span
+                        className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold ${g.badgeTone}`}
+                      >
+                        {g.badge}
+                      </span>
+                    </div>
+                    <p className="mt-0.5 text-xs text-muted-foreground">{g.desc}</p>
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      {g.tags.map((t) => {
+                        const on = pickedTags.includes(t.tag);
+                        return (
+                          <button
+                            key={t.tag}
+                            onClick={() =>
+                              setPickedTags((s) =>
+                                on ? s.filter((x) => x !== t.tag) : [...s, t.tag],
+                              )
+                            }
+                            className={`rounded-full px-2.5 py-1 text-xs font-semibold transition ${
+                              on
+                                ? "bg-primary text-white"
+                                : "bg-secondary text-foreground hover:bg-muted"
+                            }`}
+                          >
+                            {t.tag}{" "}
+                            <span className={on ? "text-white/70" : "text-muted-foreground"}>
+                              {t.reach}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                    {editingGroup === g.id && (
+                      <div className="mt-3 space-y-2 border-t border-border pt-3">
+                        {g.tags.map((t, i) => (
+                          <input
+                            key={i}
+                            value={t.tag}
+                            onChange={(e) =>
+                              setHashGroups((gs) =>
+                                gs.map((x) =>
+                                  x.id === g.id
+                                    ? {
+                                        ...x,
+                                        tags: x.tags.map((tt, ii) =>
+                                          ii === i ? { ...tt, tag: e.target.value } : tt,
+                                        ),
+                                      }
+                                    : x,
+                                ),
+                              )
+                            }
+                            className="w-full rounded-lg border border-border bg-secondary/40 px-2.5 py-1.5 text-xs font-semibold outline-none focus:border-primary"
+                          />
+                        ))}
+                        <button
+                          onClick={() =>
+                            setHashGroups((gs) =>
+                              gs.map((x) =>
+                                x.id === g.id
+                                  ? { ...x, tags: [...x.tags, { tag: "#newtag", reach: "—" }] }
+                                  : x,
+                              ),
+                            )
+                          }
+                          className="inline-flex items-center gap-1 text-xs font-bold text-primary"
+                        >
+                          <Plus className="h-3.5 w-3.5" /> Add hashtag
+                        </button>
+                      </div>
+                    )}
+                    <div className="mt-3 flex gap-2">
+                      <button
+                        onClick={() => setEditingGroup((e) => (e === g.id ? null : g.id))}
+                        className="flex-1 rounded-xl border border-border py-2 text-xs font-bold text-foreground transition hover:bg-muted"
+                      >
+                        {editingGroup === g.id ? "Done" : "Edit"}
+                      </button>
+                      <button
+                        onClick={() => {
+                          const sel = g.tags
+                            .filter((t) => pickedTags.includes(t.tag))
+                            .map((t) => t.tag);
+                          if (!sel.length) {
+                            toast.error("Select tags in this group first");
+                            return;
+                          }
+                          askPackage({
+                            kind: "hashtags",
+                            tags: sel,
+                            summary: `${sel.length} hashtag${sel.length > 1 ? "s" : ""}`,
+                          });
+                        }}
+                        className="inline-flex flex-1 items-center justify-center gap-1 rounded-xl bg-emerald-500 py-2 text-xs font-bold text-white transition hover:brightness-110"
+                      >
+                        <Sparkles className="h-3.5 w-3.5" /> Save to Package
+                      </button>
+                    </div>
+                  </div>
+                ))}
+            </div>
+          </SidebarPanel>
+
+          {/* 4 — CAMPAIGN OPTIONS: the same Generated Ideas from the left Idea Engine */}
+          <SidebarPanel
+            title="Campaign Options"
+            Icon={Megaphone}
+            open={openPanel === "campaign"}
+            onToggle={() => setOpenPanel((o) => (o === "campaign" ? null : "campaign"))}
+          >
+            {!ideas ? (
+              <p className="text-xs text-muted-foreground">
+                No ideas yet — press Generate in the AI Idea Engine on the left.
+              </p>
+            ) : (
+              <div className="space-y-2">
+                {ideas.map((idea) => {
+                  const on = pickedCampaigns.includes(idea.day);
+                  return (
+                    <button
+                      key={idea.day}
+                      onClick={() =>
+                        setPickedCampaigns((s) =>
+                          on ? s.filter((x) => x !== idea.day) : [...s, idea.day],
+                        )
+                      }
+                      className={`flex w-full items-center gap-3 rounded-xl border p-2.5 text-left transition ${
+                        on ? "border-primary bg-primary/5" : "border-border hover:bg-muted"
+                      }`}
+                    >
                       <span
                         className={`grid h-4 w-4 shrink-0 place-items-center rounded-full border-2 border-primary ${
                           on ? "bg-primary" : ""
@@ -4425,77 +5166,232 @@ function Composer({
                       >
                         {on && <Check className="h-2.5 w-2.5 text-white" />}
                       </span>
-                      <span className="truncate text-sm text-muted-foreground">{it.display}</span>
-                    </span>
-                    <span className="shrink-0 text-sm font-bold text-foreground">
-                      {it.frame.aspect}
-                    </span>
-                  </button>
-                );
-              };
-              return (
-                <div
-                  key={label}
-                  className="rounded-[18px] bg-card shadow-[0_2px_6px_rgba(26,24,35,0.14)]"
-                >
-                  <button
-                    onClick={() => setOpenSend((o) => (o === label ? null : label))}
-                    className="flex w-full items-center justify-between px-4 py-3"
-                  >
-                    <span className="flex items-center gap-2.5 text-sm font-bold text-foreground">
-                      <entry.Icon className="h-4 w-4" /> {label}
-                    </span>
-                    <ChevronDown
-                      className={`h-4 w-4 text-primary transition-transform ${open ? "rotate-180" : ""}`}
-                    />
-                  </button>
-                  {open && (
-                    <div className="px-4 pb-3">
-                      <div className="text-sm font-bold text-foreground">Choose Sizes to Post</div>
-                      {items.length === 0 ? (
-                        <p className="mt-2 text-xs text-muted-foreground">
-                          No {label} frames yet — size a frame for {label} on the board.
-                        </p>
-                      ) : (
-                        <>
-                          {vertical.length > 0 && (
-                            <div className="mt-2">
-                              <div className="text-sm font-bold text-foreground">Vertical</div>
-                              {vertical.map((it) => (
-                                <Row key={it.frame.id} it={it} />
-                              ))}
-                            </div>
-                          )}
-                          {horizontal.length > 0 && (
-                            <div className="mt-2">
-                              <div className="text-sm font-bold text-foreground">Horizontal</div>
-                              {horizontal.map((it) => (
-                                <Row key={it.frame.id} it={it} />
-                              ))}
-                            </div>
-                          )}
-                        </>
-                      )}
+                      <img
+                        src={idea.thumb}
+                        alt=""
+                        className="h-11 w-11 shrink-0 rounded-lg object-cover"
+                      />
+                      <span className="min-w-0 flex-1">
+                        <span className="flex items-center gap-1.5">
+                          <span
+                            className={`grid h-4 w-4 shrink-0 place-items-center rounded ${idea.iconBg}`}
+                          >
+                            <idea.icon className="h-2.5 w-2.5 text-white" />
+                          </span>
+                          <span className="truncate text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                            {idea.day} · {idea.platform}
+                          </span>
+                        </span>
+                        <span className="mt-1 line-clamp-2 block text-xs text-foreground/90">
+                          {idea.teaser}
+                        </span>
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+            <SaveToPackage
+              onClick={() => {
+                if (!pickedCampaigns.length) {
+                  toast.error("Select at least one campaign idea");
+                  return;
+                }
+                askPackage({
+                  kind: "campaign",
+                  campaigns: pickedCampaigns,
+                  summary: `${pickedCampaigns.length} campaign concept${pickedCampaigns.length > 1 ? "s" : ""}`,
+                });
+              }}
+            />
+          </SidebarPanel>
+
+          {/* 5 — PACKAGING OPTIONS: the package manager */}
+          <SidebarPanel
+            title="Packaging Options"
+            Icon={Package}
+            open={openPanel === "packaging"}
+            onToggle={() => setOpenPanel((o) => (o === "packaging" ? null : "packaging"))}
+          >
+            {packages.length === 0 ? (
+              <p className="text-xs text-muted-foreground">
+                No packages yet — use any “Save to Package” button above to create your first one.
+              </p>
+            ) : (
+              <div className="space-y-2">
+                {packages.map((p) => (
+                  <div key={p.id} className="rounded-2xl border border-border bg-card p-2.5">
+                    <div className="flex items-center gap-3">
+                      <button
+                        onClick={() => setPickedPkg((x) => (x === p.id ? null : p.id))}
+                        aria-label={`Select ${p.name}`}
+                        className={`grid h-4 w-4 shrink-0 place-items-center rounded-full border-2 border-primary ${
+                          pickedPkg === p.id ? "bg-primary" : ""
+                        }`}
+                      >
+                        {pickedPkg === p.id && <Check className="h-2.5 w-2.5 text-white" />}
+                      </button>
+                      <button
+                        onClick={() => setOpenPkg((o) => (o === p.id ? null : p.id))}
+                        className="flex min-w-0 flex-1 items-center gap-3 text-left"
+                      >
+                        <img
+                          src={p.image}
+                          alt=""
+                          className="h-11 w-11 shrink-0 rounded-xl object-cover"
+                        />
+                        <span className="min-w-0">
+                          <span className="block truncate text-sm font-bold text-foreground">
+                            {p.name}
+                          </span>
+                          <span className="block text-[11px] text-muted-foreground">
+                            {p.platforms.length} platforms · {p.textIds.length} text ·{" "}
+                            {p.tags.length} tags · {p.campaigns.length} ideas
+                          </span>
+                        </span>
+                      </button>
                     </div>
-                  )}
+                    {openPkg === p.id && (
+                      <div className="mt-3 space-y-3 border-t border-border pt-3">
+                        {[
+                          {
+                            label: "Content destinations",
+                            field: "platforms" as const,
+                            items: p.platforms.map((v) => ({ v, text: v })),
+                          },
+                          {
+                            label: "Captions / Scripts / Headlines",
+                            field: "textIds" as const,
+                            items: p.textIds.map((id) => ({
+                              v: id,
+                              text: savedTexts.find((t) => t.id === id)?.label ?? "Removed",
+                            })),
+                          },
+                          {
+                            label: "Hashtags",
+                            field: "tags" as const,
+                            items: p.tags.map((v) => ({ v, text: v })),
+                          },
+                          {
+                            label: "Campaign concepts",
+                            field: "campaigns" as const,
+                            items: p.campaigns.map((v) => ({ v, text: v })),
+                          },
+                        ].map((sec) => (
+                          <div key={sec.label}>
+                            <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                              {sec.label}
+                            </div>
+                            {sec.items.length === 0 ? (
+                              <p className="mt-1 text-xs text-muted-foreground/70">None yet</p>
+                            ) : (
+                              <div className="mt-1 flex flex-wrap gap-1.5">
+                                {sec.items.map((it) => (
+                                  <span
+                                    key={it.v}
+                                    className="inline-flex items-center gap-1 rounded-full bg-secondary px-2.5 py-1 text-xs font-semibold text-foreground"
+                                  >
+                                    {it.text}
+                                    <button
+                                      onClick={() => removeFromPkg(p.id, sec.field, it.v)}
+                                      aria-label={`Remove ${it.text}`}
+                                      className="text-muted-foreground transition hover:text-foreground"
+                                    >
+                                      <X className="h-3 w-3" />
+                                    </button>
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+            <button
+              onClick={sendPackageToCalendar}
+              className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-500 py-2.5 text-sm font-bold text-white shadow-sm transition hover:brightness-110"
+            >
+              <Send className="h-4 w-4" /> Send Options to Calendar
+            </button>
+          </SidebarPanel>
+
+          {/* Optional — shown only when enabled from the Select to Send settings gear. */}
+          {showScriptPanel && (
+            <SidebarPanel
+              title="Script Options"
+              Icon={FileText}
+              open={openPanel === "scripts"}
+              onToggle={() => setOpenPanel((o) => (o === "scripts" ? null : "scripts"))}
+            >
+              {savedTexts.filter((t) => t.kind === "Script").length === 0 ? (
+                <p className="text-xs text-muted-foreground">
+                  No scripts saved yet — switch the Caption Editor to Script and press Save Script.
+                </p>
+              ) : (
+                <div className="max-h-64 space-y-3 overflow-y-auto pr-1">
+                  {savedTexts
+                    .filter((t) => t.kind === "Script")
+                    .map((t) => {
+                      const on = pickedScripts.includes(t.id);
+                      return (
+                        <button
+                          key={t.id}
+                          onClick={() =>
+                            setPickedScripts((s) =>
+                              on ? s.filter((x) => x !== t.id) : [...s, t.id],
+                            )
+                          }
+                          className="flex w-full items-start gap-2.5 text-left"
+                        >
+                          <span
+                            className={`mt-0.5 grid h-4 w-4 shrink-0 place-items-center rounded-full border-2 border-primary ${
+                              on ? "bg-primary" : ""
+                            }`}
+                          >
+                            {on && <Check className="h-2.5 w-2.5 text-white" />}
+                          </span>
+                          <span className="min-w-0">
+                            <span className="block text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                              {t.label}
+                            </span>
+                            <span className="block text-sm font-bold text-foreground">
+                              {t.text}
+                            </span>
+                          </span>
+                        </button>
+                      );
+                    })}
                 </div>
-              );
-            })}
-          </div>
+              )}
+              <SaveToPackage
+                onClick={() => {
+                  if (!pickedScripts.length) {
+                    toast.error("Select at least one script");
+                    return;
+                  }
+                  askPackage({
+                    kind: "captions",
+                    textIds: pickedScripts,
+                    summary: `${pickedScripts.length} script${pickedScripts.length > 1 ? "s" : ""}`,
+                  });
+                }}
+              />
+            </SidebarPanel>
+          )}
         </div>
 
-        <div className="mt-auto space-y-2 pt-5">
+        {/* Persistent bottom CTA — the only one on this bar, in the solid purple
+            fill the Approve & Schedule button used to have. */}
+        <div className="mt-auto pt-5">
           <button
             onClick={sendAllFrames}
-            className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-primary/50 py-3 text-sm font-bold text-primary transition hover:bg-primary/10"
-          >
-            <Sparkles className="h-4 w-4" /> Send All Frames to Calendar
-          </button>
-          <button
-            onClick={sendChecked}
             className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-3 text-sm font-bold text-white shadow-lg shadow-primary/25 transition hover:brightness-110"
           >
-            <Sparkles className="h-4 w-4" /> Approve & Schedule to Calendar
+            <Sparkles className="h-4 w-4" /> Send All Frames to Calendar
           </button>
         </div>
       </div>
@@ -4735,6 +5631,116 @@ function Composer({
             </div>
           );
         })()}
+
+      {/* Shared "Save to Package" modal — used identically by Content Options,
+          Caption Options, Hashtag Options and Campaign Options. */}
+      {pkgDraft && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm"
+          onClick={closePkgModal}
+        >
+          <div
+            className="relative w-full max-w-sm rounded-2xl border border-border bg-card p-6 text-foreground shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              onClick={closePkgModal}
+              aria-label="Close"
+              className="absolute right-4 top-4 text-muted-foreground transition hover:text-foreground"
+            >
+              <X className="h-4 w-4" />
+            </button>
+
+            {packages.length === 0 ? (
+              <>
+                <h3 className="text-lg font-bold">Let’s create your first package</h3>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Adding {pkgDraft.summary.toLowerCase()}.
+                </p>
+                <label className="mt-5 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  Package name
+                </label>
+                <input
+                  autoFocus
+                  value={pkgName}
+                  onChange={(e) => setPkgName(e.target.value)}
+                  placeholder="e.g. Summer Launch"
+                  className="mt-2 w-full rounded-xl border border-border bg-secondary/40 px-3 py-2.5 text-sm font-semibold outline-none focus:border-primary focus:ring-2 focus:ring-primary/30"
+                />
+              </>
+            ) : (
+              <>
+                <h3 className="text-lg font-bold">Save to Package</h3>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Adding {pkgDraft.summary.toLowerCase()}.
+                </p>
+                <div className="mt-5 space-y-2">
+                  <button
+                    onClick={() => setPkgMode("existing")}
+                    className={`flex w-full items-center gap-3 rounded-xl border px-4 py-3 text-left transition ${
+                      pkgMode === "existing"
+                        ? "border-primary bg-primary/5"
+                        : "border-border hover:bg-muted"
+                    }`}
+                  >
+                    <Package className="h-4 w-4 shrink-0 text-primary" />
+                    <span className="text-sm font-bold">Add to Package</span>
+                  </button>
+                  {pkgMode === "existing" && (
+                    <select
+                      value={pkgPick}
+                      onChange={(e) => setPkgPick(e.target.value)}
+                      className="w-full rounded-xl border border-border bg-secondary/40 px-3 py-2.5 text-sm font-semibold outline-none focus:border-primary"
+                    >
+                      {packages.map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.name}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                  <button
+                    onClick={() => setPkgMode("new")}
+                    className={`flex w-full items-center gap-3 rounded-xl border px-4 py-3 text-left transition ${
+                      pkgMode === "new"
+                        ? "border-primary bg-primary/5"
+                        : "border-border hover:bg-muted"
+                    }`}
+                  >
+                    <FolderPlus className="h-4 w-4 shrink-0 text-primary" />
+                    <span className="text-sm font-bold">Create New Package</span>
+                  </button>
+                  {pkgMode === "new" && (
+                    <input
+                      autoFocus
+                      value={pkgName}
+                      onChange={(e) => setPkgName(e.target.value)}
+                      placeholder="New package name"
+                      className="w-full rounded-xl border border-border bg-secondary/40 px-3 py-2.5 text-sm font-semibold outline-none focus:border-primary focus:ring-2 focus:ring-primary/30"
+                    />
+                  )}
+                </div>
+              </>
+            )}
+
+            <div className="mt-6 flex gap-3">
+              <button
+                onClick={closePkgModal}
+                className="flex-1 rounded-xl border border-border bg-secondary py-2.5 text-sm font-semibold text-foreground transition hover:bg-muted"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={commitPackage}
+                disabled={packages.length > 0 && pkgMode === "choose"}
+                className="flex-1 rounded-xl bg-emerald-500 py-2.5 text-sm font-semibold text-white transition hover:brightness-110 disabled:opacity-50"
+              >
+                Save
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -5069,6 +6075,8 @@ function CalendarView({
 }) {
   const [locked, setLocked] = useState(false);
   const [inboxView, setInboxView] = useState<"grid" | "list">("grid");
+  // Double-clicking a package entry opens its detail view.
+  const [openEntry, setOpenEntry] = useState<SentPost | null>(null);
   const days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
   // Drop a sidebar post onto a day: schedule it and remove it from the inbox.
@@ -5124,6 +6132,8 @@ function CalendarView({
                 key={p.id}
                 draggable
                 onDragStart={(e) => e.dataTransfer.setData("text/plain", p.id)}
+                onDoubleClick={() => p.packageDetail && setOpenEntry(p)}
+                title={p.packageName ? "Double-click to see what's in this package" : undefined}
                 className="cursor-grab overflow-hidden rounded-lg border border-border bg-card transition hover:border-primary active:cursor-grabbing"
               >
                 <div className="relative h-24">
@@ -5135,10 +6145,17 @@ function CalendarView({
                   <span className="absolute left-1 top-1 grid h-5 w-5 place-items-center rounded bg-black/60">
                     <p.Icon className="h-3 w-3 text-white" />
                   </span>
+                  {p.packageName && (
+                    <span className="absolute bottom-1 left-1 rounded bg-black/70 px-1 py-0.5 text-[9px] font-semibold text-white">
+                      {p.platform}
+                    </span>
+                  )}
                 </div>
                 <div className="p-1.5">
                   <div className="truncate text-[11px] font-semibold">{p.contentLabel}</div>
-                  <div className="text-[10px] text-muted-foreground">{p.aspect}</div>
+                  <div className="text-[10px] text-muted-foreground">
+                    {p.packageName ? p.platform : p.aspect}
+                  </div>
                 </div>
               </div>
             ))}
@@ -5150,6 +6167,8 @@ function CalendarView({
                 key={p.id}
                 draggable
                 onDragStart={(e) => e.dataTransfer.setData("text/plain", p.id)}
+                onDoubleClick={() => p.packageDetail && setOpenEntry(p)}
+                title={p.packageName ? "Double-click to see what's in this package" : undefined}
                 className="flex cursor-grab items-center gap-2 rounded-lg border border-border bg-card p-2 transition hover:border-primary active:cursor-grabbing"
               >
                 <img src={p.image} alt="" className="h-9 w-9 shrink-0 rounded object-cover" />
@@ -5158,7 +6177,9 @@ function CalendarView({
                     {p.platform} · {p.contentLabel}
                   </div>
                   <div className="text-[10px] text-muted-foreground">
-                    {p.aspect} · {p.w}×{p.h}
+                    {p.packageName
+                      ? "Package · double-click for details"
+                      : `${p.aspect} · ${p.w}×${p.h}`}
                   </div>
                 </div>
                 <p.Icon className="h-4 w-4 shrink-0 text-muted-foreground" />
@@ -5167,6 +6188,61 @@ function CalendarView({
           </div>
         )}
       </aside>
+
+      {/* Package entry detail (double-click a calendar-sidebar package) */}
+      {openEntry && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm"
+          onClick={() => setOpenEntry(null)}
+        >
+          <div
+            className="relative max-h-[85vh] w-full max-w-sm overflow-y-auto rounded-2xl border border-border bg-card p-6 text-foreground shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              onClick={() => setOpenEntry(null)}
+              aria-label="Close"
+              className="absolute right-4 top-4 text-muted-foreground transition hover:text-foreground"
+            >
+              <X className="h-4 w-4" />
+            </button>
+            <div className="flex items-center gap-3">
+              <img src={openEntry.image} alt="" className="h-12 w-12 rounded-xl object-cover" />
+              <div className="min-w-0">
+                <div className="truncate text-base font-bold">{openEntry.packageName}</div>
+                <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <openEntry.Icon className="h-3.5 w-3.5" /> {openEntry.platform}
+                </div>
+              </div>
+            </div>
+            {[
+              {
+                label: "Captions / Scripts / Headlines",
+                items: openEntry.packageDetail?.captions ?? [],
+              },
+              { label: "Hashtags", items: openEntry.packageDetail?.tags ?? [] },
+              { label: "Campaign concepts", items: openEntry.packageDetail?.campaigns ?? [] },
+            ].map((sec) => (
+              <div key={sec.label} className="mt-4">
+                <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  {sec.label}
+                </div>
+                {sec.items.length === 0 ? (
+                  <p className="mt-1 text-xs text-muted-foreground/70">None</p>
+                ) : (
+                  <ul className="mt-1 space-y-1">
+                    {sec.items.map((it, i) => (
+                      <li key={i} className="rounded-lg bg-secondary px-2.5 py-1.5 text-xs">
+                        {it}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* MAIN — the week */}
       <div className="min-w-0 flex-1 px-8 py-8">
