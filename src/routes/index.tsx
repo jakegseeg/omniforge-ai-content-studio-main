@@ -87,6 +87,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { AiIdeaEngine } from "@/components/idea-engine/AiIdeaEngine";
+import type { Campaign } from "@/components/idea-engine/campaign-data";
 
 export const Route = createFileRoute("/")({
   component: OmniForgeApp,
@@ -99,6 +100,10 @@ export interface ComposerSeed {
   caption: string;
   thumbnail: string;
   title: string;
+  // Sent from the AI Idea Engine → land in the Composer's existing hashtag
+  // dropdown and Campaign Options dropdown (spec §11).
+  hashtags?: string[];
+  campaign?: Campaign;
 }
 
 const ACCESS_CODES = ["admin123", "omni2026"];
@@ -1186,6 +1191,9 @@ function OmniForgeApp() {
   const [authed, setAuthed] = useState(false);
   const [view, setView] = useState<View>("metrics");
   const [composerSeed, setComposerSeed] = useState<ComposerSeed | null>(null);
+  // Held at the root so a generated marketing campaign survives navigating to
+  // the Composer and back within the session (spec §14).
+  const [campaign, setCampaign] = useState<Campaign | null>(null);
   const [calendar, setCalendar] = useState(INITIAL_CALENDAR);
   // Frames sent from the Composer, waiting in the Calendar sidebar to be scheduled.
   const [sentPosts, setSentPosts] = useState<SentPost[]>([]);
@@ -1220,7 +1228,9 @@ function OmniForgeApp() {
         <div key={view} className="animate-in fade-in slide-in-from-bottom-2 duration-300">
           {view === "metrics" && <PlatformMetrics />}
           {view === "dashboard" && <Dashboard navigate={navigate} />}
-          {view === "ideas" && <AiIdeaEngine navigate={navigate} />}
+          {view === "ideas" && (
+            <AiIdeaEngine navigate={navigate} campaign={campaign} setCampaign={setCampaign} />
+          )}
           {view === "composer" && (
             <Composer
               seed={composerSeed}
@@ -3454,9 +3464,34 @@ function Composer({
   // Selections awaiting a "Save to Package" press.
   const [pickedTexts, setPickedTexts] = useState<string[]>([]);
   const [pickedCampaigns, setPickedCampaigns] = useState<string[]>([]);
-  const [pickedTags, setPickedTags] = useState<string[]>([]);
+  // Sent hashtags arrive pre-selected so they can be saved to a package right away.
+  const [pickedTags, setPickedTags] = useState<string[]>(() => seed?.hashtags ?? []);
   const [hashPill, setHashPill] = useState("All groups");
-  const [hashGroups, setHashGroups] = useState<HashGroup[]>(HASHTAG_GROUPS);
+  // Hashtags sent from the Idea Engine are injected into the EXISTING dropdown as
+  // a "Suggested" group, de-duplicated against tags already present (spec §11b).
+  const [hashGroups, setHashGroups] = useState<HashGroup[]>(() => {
+    const sent = seed?.hashtags ?? [];
+    if (!sent.length) return HASHTAG_GROUPS;
+    const existing = new Set(HASHTAG_GROUPS.flatMap((g) => g.tags.map((t) => t.tag.toLowerCase())));
+    const fresh = sent
+      .filter((t) => !existing.has(t.toLowerCase()))
+      .map((t) => ({ tag: t, reach: "—" }));
+    if (!fresh.length) return HASHTAG_GROUPS;
+    const suggested: HashGroup = {
+      id: "hg-suggested",
+      name: "Suggested from Idea Engine",
+      badge: "Suggested",
+      badgeTone: "bg-primary/15 text-primary",
+      group: "Brand",
+      desc: "Hashtags sent over with your idea or campaign",
+      tags: fresh,
+    };
+    return [suggested, ...HASHTAG_GROUPS];
+  });
+  // Campaigns sent from the Idea Engine, shown in the Campaign Options dropdown.
+  // Upsert-by-id so sending many posts from one campaign yields ONE option (§11c).
+  const [sentCampaigns] = useState<Campaign[]>(() => (seed?.campaign ? [seed.campaign] : []));
+  const [openComposerCampaign, setOpenComposerCampaign] = useState<Campaign | null>(null);
   const [editingGroup, setEditingGroup] = useState<string | null>(null);
   // Packages + the shared Save-to-Package modal.
   const [packages, setPackages] = useState<Pkg[]>([]);
@@ -5008,13 +5043,58 @@ function Composer({
             open={openPanel === "campaign"}
             onToggle={() => setOpenPanel((o) => (o === "campaign" ? null : "campaign"))}
           >
-            {!ideas ? (
+            {/* Campaigns sent from the AI Idea Engine — ordinary selectable
+                options; click the name to see the full campaign. */}
+            {sentCampaigns.length > 0 && (
+              <div className="mb-2 space-y-2">
+                {sentCampaigns.map((c) => {
+                  const on = pickedCampaigns.includes(c.name);
+                  return (
+                    <div
+                      key={c.id}
+                      className={`flex items-center gap-3 rounded-xl border p-2.5 transition ${
+                        on ? "border-primary bg-primary/5" : "border-border"
+                      }`}
+                    >
+                      <button
+                        onClick={() =>
+                          setPickedCampaigns((s) =>
+                            on ? s.filter((x) => x !== c.name) : [...s, c.name],
+                          )
+                        }
+                        aria-label={`Select ${c.name}`}
+                        className={`grid h-4 w-4 shrink-0 place-items-center rounded-full border-2 border-primary ${
+                          on ? "bg-primary" : ""
+                        }`}
+                      >
+                        {on && <Check className="h-2.5 w-2.5 text-white" />}
+                      </button>
+                      <button
+                        onClick={() => setOpenComposerCampaign(c)}
+                        className="min-w-0 flex-1 text-left"
+                      >
+                        <span className="flex items-center gap-1.5">
+                          <Megaphone className="h-3 w-3 shrink-0 text-primary" />
+                          <span className="truncate text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                            Campaign · {c.duration}
+                          </span>
+                        </span>
+                        <span className="mt-1 block truncate text-xs font-bold text-foreground">
+                          {c.name}
+                        </span>
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+            {!ideas && sentCampaigns.length === 0 ? (
               <p className="text-xs text-muted-foreground">
                 No ideas yet — press Generate in the AI Idea Engine on the left.
               </p>
             ) : (
               <div className="space-y-2">
-                {ideas.map((idea) => {
+                {(ideas ?? []).map((idea) => {
                   const on = pickedCampaigns.includes(idea.day);
                   return (
                     <button
@@ -5606,6 +5686,74 @@ function Composer({
               >
                 Save
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Campaign detail — reachable from the Campaign Options dropdown for a
+          campaign sent over from the AI Idea Engine. */}
+      {openComposerCampaign && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm"
+          onClick={() => setOpenComposerCampaign(null)}
+        >
+          <div
+            className="relative max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-border bg-card p-6 text-foreground shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              onClick={() => setOpenComposerCampaign(null)}
+              aria-label="Close"
+              className="absolute right-4 top-4 text-muted-foreground transition hover:text-foreground"
+            >
+              <X className="h-4 w-4" />
+            </button>
+            <h3 className="text-xl font-bold">{openComposerCampaign.name}</h3>
+            <p className="mt-1 text-sm text-muted-foreground">{openComposerCampaign.concept}</p>
+            <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+              {[
+                ["Goal", openComposerCampaign.goal],
+                [
+                  "Duration",
+                  `${openComposerCampaign.duration} · ${openComposerCampaign.brandPct}/${openComposerCampaign.activationPct} brand/activation`,
+                ],
+                ["Core message", openComposerCampaign.coreMessage],
+                ["CTA", openComposerCampaign.cta],
+                ["Durable insight", openComposerCampaign.durableInsight],
+                ["Audience", openComposerCampaign.audience],
+              ].map(([label, value]) => (
+                <div key={label}>
+                  <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                    {label}
+                  </div>
+                  <div className="mt-1 text-sm text-foreground">{value}</div>
+                </div>
+              ))}
+            </div>
+            <div className="mt-4">
+              <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                Content timeline ({openComposerCampaign.posts.filter((p) => !p.openSlot).length}{" "}
+                posts)
+              </div>
+              <div className="mt-2 space-y-2">
+                {openComposerCampaign.posts.map((p) => (
+                  <div
+                    key={p.id}
+                    className={`rounded-lg border p-2.5 text-xs ${
+                      p.openSlot ? "border-dashed border-border bg-secondary/30" : "border-border"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="font-semibold text-foreground">{p.position}</span>
+                      <span className="text-[10px] font-bold text-muted-foreground">
+                        {p.openSlot ? "Open slot" : `${p.phase} · ${p.type}`}
+                      </span>
+                    </div>
+                    <div className="mt-0.5 text-foreground">{p.title}</div>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         </div>

@@ -1,15 +1,37 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Loader2, RefreshCw } from "lucide-react";
 import {
   generateAdditionalTrends,
   generateTrends,
   INITIAL_TRENDS,
+  TREND_FILTERS,
   type TrendIdea,
 } from "./mock-data";
 
 export function TrendingIdeas({ onSelectIdea }: { onSelectIdea: (idea: TrendIdea) => void }) {
   const [trends, setTrends] = useState<TrendIdea[]>(INITIAL_TRENDS);
   const [loadingMore, setLoadingMore] = useState(false);
+  // Active trend filter token — "All Trends" shows everything.
+  const [activeFilter, setActiveFilter] = useState<string>(TREND_FILTERS[0]);
+  const filterRowRef = useRef<HTMLDivElement>(null);
+
+  const visibleTrends =
+    activeFilter === TREND_FILTERS[0] ? trends : trends.filter((t) => t.category === activeFilter);
+
+  // Let a vertical mouse wheel scroll the single filter row horizontally
+  // (trackpad and touch already scroll it natively).
+  useEffect(() => {
+    const el = filterRowRef.current;
+    if (!el) return;
+    const onWheel = (e: WheelEvent) => {
+      if (el.scrollWidth <= el.clientWidth) return;
+      if (Math.abs(e.deltaY) <= Math.abs(e.deltaX)) return;
+      e.preventDefault();
+      el.scrollLeft += e.deltaY;
+    };
+    el.addEventListener("wheel", onWheel, { passive: false });
+    return () => el.removeEventListener("wheel", onWheel);
+  }, []);
 
   // "Generate more ideas" — appends a fresh batch of 9 below the existing
   // list instead of replacing it, so the total keeps growing with each click
@@ -58,6 +80,31 @@ export function TrendingIdeas({ onSelectIdea }: { onSelectIdea: (idea: TrendIdea
 
   return (
     <section className="rounded-[20px] bg-card p-6 shadow-[0_2px_8px_rgba(26,24,35,0.16)]">
+      {/* Trend filter tokens — single compact, horizontally-scrollable row,
+          sitting above the title. Uses the app's existing pill styling. */}
+      <div
+        ref={filterRowRef}
+        className="mb-4 flex gap-2 overflow-x-auto whitespace-nowrap pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      >
+        {TREND_FILTERS.map((filter) => {
+          const active = activeFilter === filter;
+          return (
+            <button
+              key={filter}
+              type="button"
+              onClick={() => setActiveFilter(filter)}
+              className={`h-7 shrink-0 rounded-full px-3.5 text-xs font-bold transition ${
+                active
+                  ? "bg-primary text-white shadow-sm shadow-primary/30"
+                  : "bg-secondary text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {filter}
+            </button>
+          );
+        })}
+      </div>
+
       <div className="flex items-center justify-between">
         <div>
           <h3 className="text-base font-bold tracking-tight text-foreground">
@@ -70,38 +117,45 @@ export function TrendingIdeas({ onSelectIdea }: { onSelectIdea: (idea: TrendIdea
       </div>
 
       <div className="mt-5 max-h-[620px] overflow-y-auto scroll-smooth pr-1">
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {trends.map((trend) => (
-            <div
-              key={trend.id}
-              role="button"
-              tabIndex={0}
-              onClick={() => onSelectIdea(trend)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === " ") {
-                  e.preventDefault();
-                  onSelectIdea(trend);
-                }
-              }}
-              className="flex cursor-pointer flex-col rounded-xl border border-border bg-card p-4 transition hover:border-primary/40"
-            >
-              <h4 className="text-sm font-bold text-foreground">{trend.title}</h4>
-              <p className="mt-1.5 line-clamp-3 text-xs text-muted-foreground">
-                {trend.description}
-              </p>
-              <div className="mt-3 flex flex-wrap gap-1.5">
-                {trend.hashtags.map((tag) => (
-                  <span
-                    key={tag}
-                    className="rounded-full bg-secondary/60 px-2 py-0.5 text-[10px] font-medium text-muted-foreground"
-                  >
-                    {tag}
-                  </span>
-                ))}
+        {visibleTrends.length === 0 ? (
+          <p className="py-10 text-center text-xs text-muted-foreground">
+            No {activeFilter.toLowerCase()} trends right now — try another filter or generate more
+            below.
+          </p>
+        ) : (
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {visibleTrends.map((trend) => (
+              <div
+                key={trend.id}
+                role="button"
+                tabIndex={0}
+                onClick={() => onSelectIdea(trend)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    onSelectIdea(trend);
+                  }
+                }}
+                className="flex cursor-pointer flex-col rounded-xl border border-border bg-card p-4 transition hover:border-primary/40"
+              >
+                <h4 className="text-sm font-bold text-foreground">{trend.title}</h4>
+                <p className="mt-1.5 line-clamp-3 text-xs text-muted-foreground">
+                  {trend.description}
+                </p>
+                <div className="mt-3 flex flex-wrap gap-1.5">
+                  {trend.hashtags.map((tag) => (
+                    <span
+                      key={tag}
+                      className="rounded-full bg-secondary/60 px-2 py-0.5 text-[10px] font-medium text-muted-foreground"
+                    >
+                      {tag}
+                    </span>
+                  ))}
+                </div>
               </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="mt-6 flex justify-center border-t border-border pt-5">
