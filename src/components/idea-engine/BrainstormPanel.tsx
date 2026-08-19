@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Loader2, Send, Sparkles } from "lucide-react";
+import { Loader2, Megaphone, Send, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import {
   FOLLOW_UP_QUESTIONS,
@@ -16,16 +16,21 @@ import {
   type IdeaSeed,
   type PrefillIdea,
 } from "./mock-data";
+import type { CampaignContext } from "./campaign-data";
 
 export function BrainstormPanel({
   prefillIdea,
   onSendToComposer,
+  onMakeCampaign,
 }: {
   prefillIdea: PrefillIdea | null;
-  onSendToComposer: (seed: IdeaSeed) => void;
+  onSendToComposer: (seed: IdeaSeed, hashtags: string[]) => void;
+  onMakeCampaign: (ctx: CampaignContext) => void;
 }) {
   const [ideaText, setIdeaText] = useState("");
   const [ideaHashtags, setIdeaHashtags] = useState<string[]>([]);
+  const [ideaCategory, setIdeaCategory] = useState<string>("Lifestyle");
+  const [ideaTitle, setIdeaTitle] = useState<string>("");
   const [goal, setGoal] = useState<Goal>(GOAL_OPTIONS[0]);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isReplying, setIsReplying] = useState(false);
@@ -47,6 +52,8 @@ export function BrainstormPanel({
     }
     setIdeaText(prefillIdea.text);
     setIdeaHashtags(prefillIdea.hashtags);
+    if (prefillIdea.category) setIdeaCategory(prefillIdea.category);
+    if (prefillIdea.title) setIdeaTitle(prefillIdea.title);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [prefillIdea]);
 
@@ -110,14 +117,35 @@ export function BrainstormPanel({
   };
 
   const hasConversation = messages.length > 0;
+  const hasAiResponse = messages.some((m) => m.role === "ai");
+  const lastAiResponse = [...messages].reverse().find((m) => m.role === "ai")?.text ?? "";
 
   // Builds the finished post content from the brainstorm — caption is what
-  // actually gets posted, title becomes the Composer canvas headline.
+  // actually gets posted, title becomes the Composer canvas headline. Hashtags
+  // ride along so they land in the Composer's hashtag dropdown.
   const handleSendToComposer = () => {
-    onSendToComposer({
+    onSendToComposer(
+      {
+        caption: generateFinalCaption(ideaText, goal, ideaHashtags),
+        thumbnail: PLACEHOLDER_IDEA_THUMB,
+        title: generateHeadline(ideaText, goal),
+      },
+      ideaHashtags,
+    );
+  };
+
+  // Hands the full brainstorm session to the campaign generator — the user
+  // never retypes anything (spec §3).
+  const handleMakeCampaign = () => {
+    onMakeCampaign({
+      trendTitle: ideaTitle || ideaText.split(":")[0].trim(),
+      category: ideaCategory,
+      hook: ideaText.split(":")[0].trim(),
+      brainstorm: ideaText,
+      aiResponse: lastAiResponse,
       caption: generateFinalCaption(ideaText, goal, ideaHashtags),
-      thumbnail: PLACEHOLDER_IDEA_THUMB,
-      title: generateHeadline(ideaText, goal),
+      hashtags: ideaHashtags,
+      goal,
     });
   };
 
@@ -223,13 +251,25 @@ export function BrainstormPanel({
             </button>
           </form>
 
-          <button
-            type="button"
-            onClick={handleSendToComposer}
-            className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-5 py-3 text-sm font-bold text-white shadow-sm transition hover:brightness-110"
-          >
-            Send to Composer
-          </button>
+          {/* Two peer actions appear only once the AI has responded (spec §1). */}
+          {hasAiResponse && (
+            <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+              <button
+                type="button"
+                onClick={handleSendToComposer}
+                className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-primary px-5 py-3 text-sm font-bold text-white shadow-sm transition hover:brightness-110"
+              >
+                <Send className="h-4 w-4" /> Send to Composer
+              </button>
+              <button
+                type="button"
+                onClick={handleMakeCampaign}
+                className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl border border-primary/50 px-5 py-3 text-sm font-bold text-primary transition hover:bg-primary/10"
+              >
+                <Megaphone className="h-4 w-4" /> Make a Marketing Campaign
+              </button>
+            </div>
+          )}
         </div>
       )}
     </section>

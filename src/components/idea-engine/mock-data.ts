@@ -4,7 +4,42 @@ export type TrendIdea = {
   title: string;
   description: string;
   hashtags: string[];
+  category: string;
 };
+
+// Trend filter tokens shown above "See what's trending right now". "All Trends"
+// is pinned first and shows everything; the rest filter by a trend's category.
+export const TREND_FILTERS = [
+  "All Trends",
+  "Social Media",
+  "Viral Trends",
+  "News",
+  "AI & Tech",
+  "Business",
+  "Marketing",
+  "Creator Economy",
+  "E-Commerce",
+  "Products",
+  "Health & Wellness",
+  "Lifestyle",
+  "Travel",
+  "Work & Careers",
+  "Finance",
+  "Entertainment",
+  "Sports",
+  "Food",
+  "Fashion & Beauty",
+  "Holidays & Seasonal",
+  "Parenting & Family",
+  "Education",
+  "Local Trends",
+  "Real Estate",
+  "Sustainability",
+  "Productivity",
+  "Gaming",
+  "Music",
+  "Movies & TV",
+] as const;
 
 export type ChatMessage = {
   id: string;
@@ -30,6 +65,8 @@ export type PrefillIdea = {
   text: string;
   hashtags: string[];
   nonce: number;
+  category?: string;
+  title?: string;
 };
 
 export function ideaToPrefillText(idea: TrendIdea): string {
@@ -45,6 +82,7 @@ const TREND_POOL: TrendIdea[] = [
     title: "FIFA World Cup 2026",
     description: "World Cup match highlights, fan cams, and goal reels flood every feed daily.",
     hashtags: ["#WorldCup", "#Ronaldo", "#WorldCupHighlights"],
+    category: "Sports",
   },
   {
     id: "ai-generated-content",
@@ -52,6 +90,7 @@ const TREND_POOL: TrendIdea[] = [
     description:
       "AI-generated artwork, editing workflows, and productivity tools inspire users everywhere.",
     hashtags: ["#AIGeneratedContent", "#AIArt", "#AITools"],
+    category: "AI & Tech",
   },
   {
     id: "summer-travel",
@@ -59,6 +98,7 @@ const TREND_POOL: TrendIdea[] = [
     description:
       "Travelers share destination guides, hidden gems, and unforgettable summer experiences worldwide.",
     hashtags: ["#Summer2026", "#TravelTok", "#VacationMode"],
+    category: "Travel",
   },
   {
     id: "booktok",
@@ -66,6 +106,7 @@ const TREND_POOL: TrendIdea[] = [
     description:
       "Readers recommend emotional favorites and monthly reads through short-form videos.",
     hashtags: ["#BookTok", "#CurrentlyReading", "#BookRec"],
+    category: "Entertainment",
   },
   {
     id: "healthy-recipes",
@@ -73,24 +114,28 @@ const TREND_POOL: TrendIdea[] = [
     description:
       "Easy meal prep, nutritious recipes, and high-protein cooking videos dominate food feeds.",
     hashtags: ["#HealthyRecipes", "#MealPrep", "#HighProtein"],
+    category: "Food",
   },
   {
     id: "tech-reviews",
     title: "Tech Reviews",
     description: "Creators review smartphones, gadgets, laptops, and innovative new technology.",
     hashtags: ["#TechReviews", "#TechTok", "#Gadgets"],
+    category: "AI & Tech",
   },
   {
     id: "small-biz-automation",
     title: "Small Business Automation",
     description: "Founders share the tools and workflows saving them hours every week.",
     hashtags: ["#SmallBiz", "#Automation", "#Productivity"],
+    category: "Business",
   },
   {
     id: "sustainable-living",
     title: "Sustainable Living",
     description: "Eco swaps, zero-waste hacks, and thrifted fashion hauls keep gaining traction.",
     hashtags: ["#Sustainability", "#EcoFriendly", "#ThriftFlip"],
+    category: "Sustainability",
   },
   {
     id: "remote-work",
@@ -98,6 +143,7 @@ const TREND_POOL: TrendIdea[] = [
     description:
       "Desk tours, productivity hacks, and hybrid-work debates trend across every platform.",
     hashtags: ["#RemoteWork", "#DeskSetup", "#WFH"],
+    category: "Work & Careers",
   },
   {
     id: "fitness-challenges",
@@ -105,6 +151,7 @@ const TREND_POOL: TrendIdea[] = [
     description:
       "30-day challenges and quick home workouts drive some of the highest completion rates.",
     hashtags: ["#FitnessChallenge", "#HomeWorkout", "#30DayChallenge"],
+    category: "Health & Wellness",
   },
   {
     id: "personal-finance",
@@ -112,6 +159,7 @@ const TREND_POOL: TrendIdea[] = [
     description:
       "Budgeting hacks, side-hustle breakdowns, and investing basics resonate with young audiences.",
     hashtags: ["#PersonalFinance", "#MoneyTips", "#SideHustle"],
+    category: "Finance",
   },
   {
     id: "pet-content",
@@ -119,6 +167,7 @@ const TREND_POOL: TrendIdea[] = [
     description:
       "Rescue stories, training tips, and everyday pet moments consistently outperform other niches.",
     hashtags: ["#PetsOfInstagram", "#DogTok", "#RescueStory"],
+    category: "Lifestyle",
   },
 ];
 
@@ -157,6 +206,7 @@ function makeTrendFrom(base: TrendIdea, title: string): TrendIdea {
     title,
     description: base.description,
     hashtags: base.hashtags,
+    category: base.category,
   };
 }
 
